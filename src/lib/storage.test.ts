@@ -3,8 +3,12 @@ import type { Playlist, Song } from '../types';
 import {
   PLAYLISTS_KEY,
   SONGS_KEY,
+  deletePlaylist,
+  getPlaylist,
   getSong,
+  loadPlaylists,
   loadSongs,
+  savePlaylist,
   saveSong,
 } from './storage';
 
@@ -72,5 +76,53 @@ describe('song pool CRUD', () => {
 
   it('getSong returns undefined for unknown id', () => {
     expect(getSong('nope0000000')).toBeUndefined();
+  });
+});
+
+describe('playlist CRUD', () => {
+  it('returns empty array when nothing stored', () => {
+    expect(loadPlaylists()).toEqual([]);
+  });
+
+  it('returns empty array when stored JSON is corrupt', () => {
+    localStorage.setItem(PLAYLISTS_KEY, 'broken[');
+    expect(loadPlaylists()).toEqual([]);
+  });
+
+  it('savePlaylist appends a new playlist', () => {
+    const p = makePlaylist({ id: 'a-1111' });
+    savePlaylist(p);
+    expect(loadPlaylists()).toEqual([p]);
+  });
+
+  it('savePlaylist replaces an existing playlist with same id in place', () => {
+    savePlaylist(makePlaylist({ id: 'a-1111', title: 'One' }));
+    savePlaylist(makePlaylist({ id: 'b-2222', title: 'Two' }));
+    savePlaylist(makePlaylist({ id: 'a-1111', title: 'One v2' }));
+    const all = loadPlaylists();
+    expect(all).toHaveLength(2);
+    expect(all[0].title).toBe('One v2'); // replaced in original position
+    expect(all[1].title).toBe('Two');
+  });
+
+  it('getPlaylist returns the matching playlist or undefined', () => {
+    savePlaylist(makePlaylist({ id: 'a-1111' }));
+    expect(getPlaylist('a-1111')?.id).toBe('a-1111');
+    expect(getPlaylist('missing')).toBeUndefined();
+  });
+
+  it('deletePlaylist removes only the matching playlist', () => {
+    savePlaylist(makePlaylist({ id: 'a-1111' }));
+    savePlaylist(makePlaylist({ id: 'b-2222' }));
+    deletePlaylist('a-1111');
+    const all = loadPlaylists();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe('b-2222');
+  });
+
+  it('deletePlaylist on unknown id is a no-op', () => {
+    savePlaylist(makePlaylist({ id: 'a-1111' }));
+    deletePlaylist('nope');
+    expect(loadPlaylists()).toHaveLength(1);
   });
 });

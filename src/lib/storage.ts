@@ -32,4 +32,27 @@ export function saveSong(song: Song): void {
   writeJson(SONGS_KEY, songs);
 }
 
-void (null as unknown as Playlist);
+export function loadPlaylists(): Playlist[] {
+  const data = readJson<Playlist[]>(PLAYLISTS_KEY, []);
+  return Array.isArray(data) ? data : [];
+}
+
+export function getPlaylist(id: string): Playlist | undefined {
+  return loadPlaylists().find((p) => p.id === id);
+}
+
+export function savePlaylist(p: Playlist): void {
+  const all = loadPlaylists();
+  const idx = all.findIndex((x) => x.id === p.id);
+  if (idx >= 0) {
+    all[idx] = p;
+  } else {
+    all.push(p);
+  }
+  writeJson(PLAYLISTS_KEY, all);
+}
+
+export function deletePlaylist(id: string): void {
+  const all = loadPlaylists().filter((p) => p.id !== id);
+  writeJson(PLAYLISTS_KEY, all);
+}
