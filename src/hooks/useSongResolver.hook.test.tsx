@@ -16,7 +16,9 @@ vi.mock('../lib/storage', () => ({ saveSong: vi.fn() }));
 import { useSongResolver } from './useSongResolver';
 
 describe('useSongResolver (smoke)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('mounts and exposes resolve + resolving=false', () => {
     const { result } = renderHook(() => useSongResolver());
