@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { hexToRgb, rgbToHex } from './colors';
 import { rgbToHsl, hslToRgb } from './colors';
 import { relativeLuminance, contrastRatio } from './colors';
+import { clampLightness } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -100,5 +101,29 @@ describe('contrastRatio', () => {
   });
   it('same color is 1', () => {
     expect(contrastRatio('#abcdef', '#abcdef')).toBeCloseTo(1, 5);
+  });
+});
+
+describe('clampLightness', () => {
+  it('darkens a too-bright color down to maxL', () => {
+    const out = clampLightness('#ffffff', 0.1, 0.4); // white l=1 -> clamp to 0.4
+    const [, , l] = rgbToHsl(...hexToRgb(out));
+    expect(l).toBeLessThanOrEqual(0.41);
+    expect(l).toBeGreaterThanOrEqual(0.39);
+  });
+  it('lightens a too-dark color up to minL', () => {
+    const out = clampLightness('#000000', 0.2, 0.9); // black l=0 -> clamp to 0.2
+    const [, , l] = rgbToHsl(...hexToRgb(out));
+    expect(l).toBeGreaterThanOrEqual(0.19);
+    expect(l).toBeLessThanOrEqual(0.21);
+  });
+  it('leaves in-range lightness unchanged (hue/sat preserved)', () => {
+    const src = '#3a7fbf';
+    const [h0, s0, l0] = rgbToHsl(...hexToRgb(src));
+    const out = clampLightness(src, 0.1, 0.9);
+    const [h1, s1, l1] = rgbToHsl(...hexToRgb(out));
+    expect(l1).toBeCloseTo(l0, 1);
+    expect(h1).toBeCloseTo(h0, 0);
+    expect(s1).toBeCloseTo(s0, 1);
   });
 });

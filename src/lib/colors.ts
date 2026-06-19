@@ -74,3 +74,9 @@ export function contrastRatio(hexA: string, hexB: string): number {
   const darker = Math.min(la, lb);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+export function clampLightness(hex: string, minL: number, maxL: number): string {
+  const [h, s, l] = rgbToHsl(...hexToRgb(hex));
+  const cl = Math.max(minL, Math.min(maxL, l));
+  return rgbToHex(...hslToRgb(h, s, cl));
+}
