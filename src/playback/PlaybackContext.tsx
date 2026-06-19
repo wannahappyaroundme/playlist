@@ -191,11 +191,8 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
 
   const next = useCallback(() => {
     const idx = nextIndex(indexRef.current, queueRef.current.length, repeatRef.current);
-    if (idx === null) {
-      setIsPlaying(false);
-      playerRef.current?.pauseVideo();
-      return;
-    }
+    // off 마지막 트랙: prev의 0-클램프 무동작과 대칭 — 현재 곡을 끊지 않고 그대로 둔다.
+    if (idx === null) return;
     goTo(idx);
   }, [goTo]);
 

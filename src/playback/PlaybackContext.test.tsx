@@ -87,6 +87,15 @@ describe('usePlayback state machine (smoke)', () => {
     expect(result.current.currentIndex).toBe(0); // clamped at 0 when off
   });
 
+  it('next() at the last track in off mode does nothing (symmetric with prev clamp)', () => {
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    act(() => result.current.playQueue([song('a1'), song('b2')], 1)); // start at last
+    act(() => result.current.next());
+    // index unchanged and playback not forcibly paused
+    expect(result.current.currentIndex).toBe(1);
+    expect(result.current.isPlaying).toBe(false); // unchanged from initial (no live player)
+  });
+
   it('getCurrentTime returns 0 when no live player', () => {
     const { result } = renderHook(() => usePlayback(), { wrapper });
     expect(result.current.getCurrentTime()).toBe(0);
