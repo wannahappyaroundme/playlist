@@ -101,3 +101,41 @@ describe('parseLrc — 기본 파싱', () => {
     expect(lines[2].time).toBeCloseTo(9.8, 5);
   });
 });
+
+describe('parseLrc — 멀티 타임태그 & offset', () => {
+  it('한 줄의 멀티 타임태그를 각 시각마다 별도 라인으로 전개한다', () => {
+    const raw = '[00:01.00][00:05.00][00:09.00]repeat hook';
+    const { lines } = parseLrc(raw);
+    expect(lines).toHaveLength(3);
+    expect(lines.map((l) => l.time)).toEqual([1, 5, 9]);
+    expect(lines.every((l) => l.text === 'repeat hook')).toBe(true);
+  });
+
+  it('멀티 타임태그가 다른 줄과 섞여도 전체를 time순으로 정렬한다', () => {
+    const raw = [
+      '[00:08.00]later',
+      '[00:01.00][00:05.00]hook',
+      '[00:03.00]mid',
+    ].join('\n');
+    const { lines } = parseLrc(raw);
+    expect(lines.map((l) => l.time)).toEqual([1, 3, 5, 8]);
+    expect(lines.map((l) => l.text)).toEqual(['hook', 'mid', 'hook', 'later']);
+  });
+
+  it('[offset:+250] 양수 메타태그를 offsetMs=250으로 반환한다', () => {
+    const raw = ['[offset:+250]', '[00:00.00]x'].join('\n');
+    expect(parseLrc(raw).offsetMs).toBe(250);
+  });
+
+  it('[offset:-120] 음수 메타태그를 offsetMs=-120으로 반환한다', () => {
+    const raw = ['[offset:-120]', '[00:00.00]x'].join('\n');
+    expect(parseLrc(raw).offsetMs).toBe(-120);
+  });
+
+  it('offset 메타태그는 라인 time에 영향을 주지 않는다(소비측에서 반영)', () => {
+    const raw = ['[offset:+500]', '[00:10.00]ten'].join('\n');
+    const { lines, offsetMs } = parseLrc(raw);
+    expect(offsetMs).toBe(500);
+    expect(lines[0].time).toBeCloseTo(10, 5); // 10초 그대로, 10.5 아님
+  });
+});
