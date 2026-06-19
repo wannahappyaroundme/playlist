@@ -162,4 +162,42 @@ describe('parseTitleHeuristic', () => {
       title: 'Just A Song',
     });
   });
+
+  it('parses real Korean lyric-video title with fullwidth pipe ㅣ + duplicated bracket', () => {
+    expect(
+      parseTitleHeuristic('빈첸 - FLYING HIGH WITH U [FLYING HIGH WITH U]ㅣLyrics/가사', '알파'),
+    ).toEqual({ artist: '빈첸', title: 'FLYING HIGH WITH U' });
+  });
+
+  it('strips bracketed segments even when they are not keyword noise', () => {
+    expect(parseTitleHeuristic('Artist - Song [Some Extra]', 'Chan')).toEqual({
+      artist: 'Artist',
+      title: 'Song',
+    });
+  });
+
+  it('strips a trailing fullwidth-pipe lyrics suffix on a Korean title', () => {
+    expect(parseTitleHeuristic('가수 - 노래 [노래]ㅣ가사', '채널')).toEqual({
+      artist: '가수',
+      title: '노래',
+    });
+  });
+
+  it('handles "Song [MV]" with no artist separator (author fallback)', () => {
+    expect(parseTitleHeuristic('Song [MV]', 'BandChannel')).toEqual({
+      artist: 'BandChannel',
+      title: 'Song',
+    });
+  });
+
+  it('keeps a clean "A - B" intact', () => {
+    expect(parseTitleHeuristic('A - B', 'Chan')).toEqual({ artist: 'A', title: 'B' });
+  });
+
+  it('falls back to author for a title with no separator', () => {
+    expect(parseTitleHeuristic('JustOneName', 'TheAuthor')).toEqual({
+      artist: 'TheAuthor',
+      title: 'JustOneName',
+    });
+  });
 });
