@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseLrc } from '../lib/lrc';
 import { parseTitleHeuristic, resolveBestThumbnail } from '../lib/youtube';
 import { buildSongColors, FALLBACK_COLORS, extractPalette, type RawPalette } from '../lib/colors';
@@ -145,6 +145,19 @@ export function useSongResolver(): SongResolver {
   const probeRef = useRef<YtPlayer | null>(null);
   // 현재 진행 중인 getMeta 폴링 동안 프로브에서 onError가 발생했는지.
   const probeErroredRef = useRef(false);
+  // 라우트 전환 언마운트 가드: createYtPlayer가 늦게 resolve돼도 누수되지 않게 한다.
+  const aliveRef = useRef(true);
+
+  // 언마운트 시 프로브 player/노드를 정리(라우트별 컴포넌트라 필수) + race 가드.
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      probeRef.current?.destroy();
+      probeRef.current = null;
+      document.getElementById(PROBE_ELEMENT_ID)?.remove();
+    };
+  }, []);
 
   const ensureProbe = useCallback(async (): Promise<YtPlayer> => {
     if (probeRef.current) return probeRef.current;
@@ -163,6 +176,12 @@ export function useSongResolver(): SongResolver {
       // 재생 불가 영상: 폴링이 빈 메타로 곡을 캐시 고착시키지 않도록 에러를 표시한다.
       onError: () => { probeErroredRef.current = true; },
     });
+    // ready 전에 언마운트됐다면 즉시 파기(영구 누수/경쟁조건 방지).
+    if (!aliveRef.current) {
+      player.destroy();
+      document.getElementById(PROBE_ELEMENT_ID)?.remove();
+      throw new Error('probe unmounted before ready');
+    }
     probeRef.current = player;
     return player;
   }, []);
