@@ -42,3 +42,16 @@ export function parseVideoId(input: string): string | null {
 
   return null;
 }
+
+export type ThumbQuality = 'maxresdefault' | 'sddefault' | 'hqdefault' | 'mqdefault';
+
+export const THUMB_FALLBACK: readonly ThumbQuality[] = [
+  'maxresdefault',
+  'sddefault',
+  'hqdefault',
+  'mqdefault',
+] as const;
+
+export function thumbnailUrl(videoId: string, quality: ThumbQuality = 'maxresdefault'): string {
+  return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
+}

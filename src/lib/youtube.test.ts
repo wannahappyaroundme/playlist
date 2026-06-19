@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseVideoId } from './youtube';
+import { parseVideoId, thumbnailUrl, THUMB_FALLBACK } from './youtube';
 
 describe('parseVideoId', () => {
   const ID = 'dQw4w9WgXcQ'; // valid 11-char id
@@ -48,5 +48,32 @@ describe('parseVideoId', () => {
     expect(parseVideoId('https://www.youtube.com/watch?v=waytoolongid12345')).toBeNull();
     expect(parseVideoId('abcdefghij')).toBeNull(); // 10 chars
     expect(parseVideoId('abcdefghij!!')).toBeNull(); // invalid chars
+  });
+});
+
+describe('thumbnailUrl', () => {
+  const ID = 'dQw4w9WgXcQ';
+
+  it('defaults to maxresdefault', () => {
+    expect(thumbnailUrl(ID)).toBe(`https://i.ytimg.com/vi/${ID}/maxresdefault.jpg`);
+  });
+
+  it('builds url for each explicit quality', () => {
+    expect(thumbnailUrl(ID, 'sddefault')).toBe(`https://i.ytimg.com/vi/${ID}/sddefault.jpg`);
+    expect(thumbnailUrl(ID, 'hqdefault')).toBe(`https://i.ytimg.com/vi/${ID}/hqdefault.jpg`);
+    expect(thumbnailUrl(ID, 'mqdefault')).toBe(`https://i.ytimg.com/vi/${ID}/mqdefault.jpg`);
+  });
+});
+
+describe('THUMB_FALLBACK', () => {
+  it('lists qualities best-first', () => {
+    expect(THUMB_FALLBACK).toEqual(['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault']);
+  });
+
+  it('every entry produces a valid url', () => {
+    const ID = 'dQw4w9WgXcQ';
+    for (const q of THUMB_FALLBACK) {
+      expect(thumbnailUrl(ID, q)).toBe(`https://i.ytimg.com/vi/${ID}/${q}.jpg`);
+    }
   });
 });
