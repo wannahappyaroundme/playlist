@@ -4,6 +4,7 @@ import { rgbToHsl, hslToRgb } from './colors';
 import { relativeLuminance, contrastRatio } from './colors';
 import { clampLightness } from './colors';
 import { ensureReadableOnWhite } from './colors';
+import { quantize } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -144,5 +145,58 @@ describe('ensureReadableOnWhite', () => {
   });
   it('returns a valid hex string', () => {
     expect(ensureReadableOnWhite('#abcdef')).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+// helper: build RGBA Uint8ClampedArray from list of [r,g,b] repeated `count` times
+function pixelsFrom(spec: Array<[number, number, number, number]>): Uint8ClampedArray {
+  const total = spec.reduce((n, s) => n + s[3], 0);
+  const arr = new Uint8ClampedArray(total * 4);
+  let i = 0;
+  for (const [r, g, b, count] of spec) {
+    for (let c = 0; c < count; c++) {
+      arr[i++] = r; arr[i++] = g; arr[i++] = b; arr[i++] = 255;
+    }
+  }
+  return arr;
+}
+
+describe('quantize', () => {
+  it('returns an object (RawPalette) for non-empty pixels', () => {
+    const px = pixelsFrom([[200, 30, 30, 50]]);
+    const pal = quantize(px, 1);
+    expect(typeof pal).toBe('object');
+  });
+
+  it('picks a saturated dominant color as vibrant', () => {
+    // mostly vivid red, plus some gray noise
+    const px = pixelsFrom([[220, 20, 20, 200], [128, 128, 128, 30]]);
+    const pal = quantize(px, 1);
+    expect(pal.vibrant).toBeDefined();
+    const [h, s] = rgbToHsl(...hexToRgb(pal.vibrant!));
+    expect(s).toBeGreaterThan(0.4);       // vibrant must be saturated
+    // hue near red: either >330 or <30 (pure red maps to 0)
+    expect(h > 330 || h < 30).toBe(true);
+  });
+
+  it('classifies a dark saturated color as darkVibrant', () => {
+    const px = pixelsFrom([[40, 8, 8, 300]]); // dark red
+    const pal = quantize(px, 1);
+    expect(pal.darkVibrant).toBeDefined();
+    const [, , l] = rgbToHsl(...hexToRgb(pal.darkVibrant!));
+    expect(l).toBeLessThan(0.4);
+  });
+
+  it('classifies a low-saturation mid color as muted', () => {
+    const px = pixelsFrom([[120, 110, 100, 300]]); // grayish
+    const pal = quantize(px, 1);
+    expect(pal.muted).toBeDefined();
+    const [, s] = rgbToHsl(...hexToRgb(pal.muted!));
+    expect(s).toBeLessThan(0.4);
+  });
+
+  it('returns empty palette for empty pixels', () => {
+    const pal = quantize(new Uint8ClampedArray(0), 1);
+    expect(pal).toEqual({});
   });
 });

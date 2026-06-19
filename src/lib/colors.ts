@@ -93,3 +93,74 @@ export function ensureReadableOnWhite(bgHex: string, minRatio = 4.5): string {
   }
   return hex;
 }
+
+export interface RawPalette {
+  vibrant?: string;
+  darkVibrant?: string;
+  lightVibrant?: string;
+  muted?: string;
+  darkMuted?: string;
+}
+
+interface Bucket { r: number; g: number; b: number; count: number; }
+
+export function quantize(pixels: Uint8ClampedArray, sampleStep = 4): RawPalette {
+  const step = Math.max(1, Math.floor(sampleStep));
+  const buckets = new Map<number, Bucket>();
+  // group into 16-level-per-channel buckets (4 bits each -> 12-bit key)
+  for (let i = 0; i + 3 < pixels.length; i += 4 * step) {
+    const a = pixels[i + 3];
+    if (a < 125) continue; // skip transparent
+    const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    const bk = buckets.get(key);
+    if (bk) { bk.r += r; bk.g += g; bk.b += b; bk.count++; }
+    else buckets.set(key, { r, g, b, count: 1 });
+  }
+  if (buckets.size === 0) return {};
+
+  // representative color per bucket (average), with hsl + score
+  type Cand = { hex: string; h: number; s: number; l: number; count: number };
+  const cands: Cand[] = [];
+  for (const bk of buckets.values()) {
+    const r = Math.round(bk.r / bk.count);
+    const g = Math.round(bk.g / bk.count);
+    const b = Math.round(bk.b / bk.count);
+    const [h, s, l] = rgbToHsl(r, g, b);
+    cands.push({ hex: rgbToHex(r, g, b), h, s, l, count: bk.count });
+  }
+
+  const palette: RawPalette = {};
+  // pick best candidate matching predicate by weighted (saturation * count) or count
+  const pickVivid = (pred: (c: Cand) => boolean) => {
+    let best: Cand | undefined;
+    let bestScore = -1;
+    for (const c of cands) {
+      if (!pred(c)) continue;
+      const score = (c.s + 0.1) * c.count;
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    return best?.hex;
+  };
+  const pickByCount = (pred: (c: Cand) => boolean) => {
+    let best: Cand | undefined;
+    let bestCount = -1;
+    for (const c of cands) {
+      if (!pred(c)) continue;
+      if (c.count > bestCount) { bestCount = c.count; best = c; }
+    }
+    return best?.hex;
+  };
+
+  palette.vibrant = pickVivid((c) => c.s >= 0.4 && c.l >= 0.35 && c.l <= 0.7);
+  palette.lightVibrant = pickVivid((c) => c.s >= 0.3 && c.l > 0.7);
+  palette.darkVibrant = pickVivid((c) => c.s >= 0.3 && c.l < 0.4);
+  palette.muted = pickByCount((c) => c.s < 0.4 && c.l >= 0.3 && c.l <= 0.7);
+  palette.darkMuted = pickByCount((c) => c.s < 0.4 && c.l < 0.3);
+
+  // strip undefined entries for a clean object
+  (Object.keys(palette) as (keyof RawPalette)[]).forEach((k) => {
+    if (palette[k] === undefined) delete palette[k];
+  });
+  return palette;
+}
