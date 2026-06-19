@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* --- color slots (interpolated per-song; see colors.ts) --- */
+  --c1: #1a1830; /* gradientFrom */
+  --c2: #0e0c1c; /* gradientTo */
+  --c3: #7c5cff; /* accent */
+
+  /* --- lyric line luminance steps (spec 7) --- */
+  --line-active: 1;
+  --line-near: 0.55;
+  --line-far: 0.28;
+  --line-faint: 0.14;
+
+  /* --- easing & durations --- */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-line: 550ms;   /* lyric scroll transition (clamped at runtime) */
+  --dur-bg: 1200ms;    /* background crossfade between songs */
+  --spin-dur: 5000ms;  /* LP one full rotation (linear) */
+
+  /* --- layout --- */
+  --lp-overlap: 42%;   /* LP slides over cover (40~45%) */
+
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c2);
+  color: #ffffff;
+  font-family: 'Pretendard', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* tabular numerals for progress time (spec 7) */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --spin-dur: 0ms;
+  }
+}
