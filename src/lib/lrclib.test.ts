@@ -35,3 +35,60 @@ describe('fetchLyrics /api/get success', () => {
     expect(headers['Lrclib-Client']).toBeTruthy();
   });
 });
+
+describe('fetchLyrics /api/get 404 -> /api/search fallback', () => {
+  it('falls back to /api/search and returns the first candidate', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 404, message: 'Not Found' }, 404)) // /api/get
+      .mockResolvedValueOnce(
+        jsonResponse([
+          { syncedLyrics: '[00:02.00] first', plainLyrics: 'first' },
+          { syncedLyrics: '[00:03.00] second', plainLyrics: 'second' },
+        ]),
+      ) as unknown as typeof fetch; // /api/search
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl);
+
+    expect(res).toEqual({ syncedLyrics: '[00:02.00] first', plainLyrics: 'first' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+
+    const calls = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(String(calls[0][0])).toContain('/api/get');
+    const searchUrl = String(calls[1][0]);
+    expect(searchUrl).toContain('/api/search');
+    expect(searchUrl).toContain('track_name=B');
+    expect(searchUrl).toContain('artist_name=A');
+    const searchHeaders = (calls[1][1] as RequestInit | undefined)?.headers as Record<string, string>;
+    expect(searchHeaders['Lrclib-Client']).toBeTruthy();
+  });
+
+  it('returns null when /api/get 404 and /api/search is empty array', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 404 }, 404))
+      .mockResolvedValueOnce(jsonResponse([])) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl);
+    expect(res).toBeNull();
+  });
+
+  it('returns null when /api/get 404 and /api/search also fails (non-ok)', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 404 }, 404))
+      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 500)) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl);
+    expect(res).toBeNull();
+  });
+
+  it('returns null when fetch throws on both calls', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('network down');
+    }) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl);
+    expect(res).toBeNull();
+  });
+});
