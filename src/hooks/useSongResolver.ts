@@ -143,6 +143,8 @@ const META_TIMEOUT_MS = 8000;
 export function useSongResolver(): SongResolver {
   const [resolving, setResolving] = useState(false);
   const probeRef = useRef<YtPlayer | null>(null);
+  // 현재 진행 중인 getMeta 폴링 동안 프로브에서 onError가 발생했는지.
+  const probeErroredRef = useRef(false);
 
   const ensureProbe = useCallback(async (): Promise<YtPlayer> => {
     if (probeRef.current) return probeRef.current;
@@ -157,7 +159,10 @@ export function useSongResolver(): SongResolver {
       el.style.pointerEvents = 'none';
       document.body.appendChild(el);
     }
-    const player = await createYtPlayer(PROBE_ELEMENT_ID, {});
+    const player = await createYtPlayer(PROBE_ELEMENT_ID, {
+      // 재생 불가 영상: 폴링이 빈 메타로 곡을 캐시 고착시키지 않도록 에러를 표시한다.
+      onError: () => { probeErroredRef.current = true; },
+    });
     probeRef.current = player;
     return player;
   }, []);
@@ -165,6 +170,7 @@ export function useSongResolver(): SongResolver {
   const getMeta = useCallback(
     async (videoId: string) => {
       const probe = await ensureProbe();
+      probeErroredRef.current = false;
       await new Promise<void>((resolve) => {
         let settled = false;
         const finish = () => {
@@ -176,6 +182,7 @@ export function useSongResolver(): SongResolver {
         probe.cueVideoById(videoId);
         const start = Date.now();
         const poll = () => {
+          if (probeErroredRef.current) { finish(); return; }
           const data = probe.getVideoData();
           const dur = probe.getDuration();
           if (metaPollDone(data, dur, Date.now() - start, META_TIMEOUT_MS)) {
@@ -189,8 +196,8 @@ export function useSongResolver(): SongResolver {
       const data = probe.getVideoData();
       const dur = probe.getDuration() || 0;
       const title = data.title || '';
-      // metaReady: title + duration까지 받았는지(타임아웃 빈-메타 식별용)
-      const metaReady = !!(data.video_id && title && dur > 0);
+      // metaReady: 에러 없이 title + duration까지 받았는지(타임아웃/에러 빈-메타 식별용)
+      const metaReady = !probeErroredRef.current && !!(data.video_id && title && dur > 0);
       return {
         video_id: data.video_id || videoId,
         title,

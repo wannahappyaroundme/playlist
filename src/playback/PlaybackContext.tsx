@@ -38,6 +38,22 @@ export function endedAction(
   return { kind: 'play', index: idx };
 }
 
+/**
+ * 플레이어 에러(영상 삭제/비공개/임베드 불가 등) 시 다음 동작.
+ * 깨진 트랙을 다시 재생하면 에러가 반복되므로 'one'이어도 replay하지 않고 다음으로 넘긴다.
+ * 'all'은 wrap, 그 외(off/one)는 단방향 전진 후 끝에서 정지.
+ */
+export function errorAction(
+  current: number,
+  length: number,
+  repeat: RepeatMode,
+): EndedAction {
+  const effective: RepeatMode = repeat === 'all' ? 'all' : 'off';
+  const idx = nextIndex(current, length, effective);
+  if (idx === null) return { kind: 'stop' };
+  return { kind: 'play', index: idx };
+}
+
 export interface PlaybackApi {
   queue: Song[];
   currentIndex: number;
@@ -104,6 +120,16 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
           } else {
             setIsPlaying(false);
           }
+        }
+      },
+      onError: () => {
+        // 영상 재생 불가(삭제/비공개/임베드 차단 등): 다음 재생 가능 트랙으로 건너뛰거나 정지.
+        const action = errorAction(indexRef.current, queueRef.current.length, repeatRef.current);
+        if (action.kind === 'play') {
+          goTo(action.index);
+        } else {
+          setIsPlaying(false);
+          playerRef.current?.pauseVideo();
         }
       },
     })

@@ -57,6 +57,7 @@ export interface YtPlayer {
 export interface YtPlayerEvents {
   onReady?(): void;
   onStateChange?(state: number): void;
+  onError?(code: number): void;
 }
 
 // minimal ambient typing for the global YT namespace + ready callback
@@ -71,6 +72,7 @@ declare global {
           events?: {
             onReady?: () => void;
             onStateChange?: (e: { data: number }) => void;
+            onError?: (e: { data: number }) => void;
           };
         },
       ) => YtPlayer;
@@ -112,6 +114,7 @@ export async function createYtPlayer(
           resolve(player);
         },
         onStateChange: (e) => events.onStateChange?.(e.data),
+        onError: (e) => events.onError?.(e.data),
       },
     });
   });
