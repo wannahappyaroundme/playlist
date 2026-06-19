@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseVideoId, thumbnailUrl, THUMB_FALLBACK } from './youtube';
+import {
+  parseVideoId,
+  thumbnailUrl,
+  THUMB_FALLBACK,
+  parseTitleHeuristic,
+} from './youtube';
 
 describe('parseVideoId', () => {
   const ID = 'dQw4w9WgXcQ'; // valid 11-char id
@@ -75,5 +80,86 @@ describe('THUMB_FALLBACK', () => {
     for (const q of THUMB_FALLBACK) {
       expect(thumbnailUrl(ID, q)).toBe(`https://i.ytimg.com/vi/${ID}/${q}.jpg`);
     }
+  });
+});
+
+describe('parseTitleHeuristic', () => {
+  it('splits "Artist - Title" on " - "', () => {
+    expect(parseTitleHeuristic('IU - Blueming', 'IU Official')).toEqual({
+      artist: 'IU',
+      title: 'Blueming',
+    });
+  });
+
+  it('strips (Official Video) and similar markers', () => {
+    expect(parseTitleHeuristic('NewJeans - Ditto (Official Music Video)', 'HYBE LABELS')).toEqual({
+      artist: 'NewJeans',
+      title: 'Ditto',
+    });
+    expect(parseTitleHeuristic('aespa - Spicy (Official MV)', 'SMTOWN')).toEqual({
+      artist: 'aespa',
+      title: 'Spicy',
+    });
+  });
+
+  it('strips bracketed markers like [MV], [Lyrics], [4K]', () => {
+    expect(parseTitleHeuristic('BTS - Dynamite [MV]', 'HYBE LABELS')).toEqual({
+      artist: 'BTS',
+      title: 'Dynamite',
+    });
+    expect(parseTitleHeuristic('Adele - Hello [Official Audio]', 'AdeleVEVO')).toEqual({
+      artist: 'Adele',
+      title: 'Hello',
+    });
+  });
+
+  it('uses only the first " - " as the split point', () => {
+    expect(parseTitleHeuristic('A - B - C', 'Chan')).toEqual({
+      artist: 'A',
+      title: 'B - C',
+    });
+  });
+
+  it('handles en-dash / em-dash separators', () => {
+    expect(parseTitleHeuristic('Artist – Title', 'Chan')).toEqual({
+      artist: 'Artist',
+      title: 'Title',
+    });
+    expect(parseTitleHeuristic('Artist — Title', 'Chan')).toEqual({
+      artist: 'Artist',
+      title: 'Title',
+    });
+  });
+
+  it('falls back to author when there is no separator', () => {
+    expect(parseTitleHeuristic('Blueming (Official Video)', 'IU Official')).toEqual({
+      artist: 'IU Official',
+      title: 'Blueming',
+    });
+  });
+
+  it('falls back to author when split would leave an empty side', () => {
+    expect(parseTitleHeuristic(' - Title', 'Chan')).toEqual({
+      artist: 'Chan',
+      title: 'Title',
+    });
+    expect(parseTitleHeuristic('Artist - ', 'Chan')).toEqual({
+      artist: 'Chan',
+      title: 'Artist',
+    });
+  });
+
+  it('trims whitespace on both sides', () => {
+    expect(parseTitleHeuristic('  IU   -   Blueming  ', 'IU Official')).toEqual({
+      artist: 'IU',
+      title: 'Blueming',
+    });
+  });
+
+  it('keeps a clean raw title when no markers and no separator', () => {
+    expect(parseTitleHeuristic('Just A Song', 'Some Channel')).toEqual({
+      artist: 'Some Channel',
+      title: 'Just A Song',
+    });
   });
 });
