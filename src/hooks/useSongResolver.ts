@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { parseLrc } from '../lib/lrc';
-import { parseTitleHeuristic, thumbnailUrl } from '../lib/youtube';
+import { parseTitleHeuristic, resolveBestThumbnail } from '../lib/youtube';
 import { buildSongColors, FALLBACK_COLORS, extractPalette, type RawPalette } from '../lib/colors';
 import { fetchLyrics } from '../lib/lrclib';
 import { saveSong } from '../lib/storage';
@@ -81,6 +81,8 @@ export function metaPollDone(
 
 export interface ResolveDeps {
   getMeta(videoId: string): Promise<ProbeMeta>;
+  /** THUMB_FALLBACK 체인으로 실제 로드되는 커버 URL을 고른다. 미주입 시 resolveBestThumbnail 사용. */
+  resolveCover?(videoId: string): Promise<string>;
   extractPalette(coverUrl: string): Promise<RawPalette>;
   fetchLyrics(p: { artist: string; track: string; durationSec: number }): Promise<LrclibResponse | null>;
   saveSong(song: Song): void;
@@ -97,7 +99,8 @@ export async function resolveSongWith(videoId: string, deps: ResolveDeps): Promi
   if (meta.metaReady === false) {
     throw new Error(`metadata unavailable for video ${videoId}`);
   }
-  const cover = thumbnailUrl(videoId);
+  // 커버는 폴백 체인으로 '실제 로드되는' quality를 고른다 (maxres 부재 영상 대응).
+  const cover = await (deps.resolveCover ?? resolveBestThumbnail)(videoId);
 
   let colors: SongColors;
   try {

@@ -10,6 +10,7 @@ function makeDeps(over: Partial<ResolveDeps> = {}): ResolveDeps {
       author: 'IU Official',
       durationSec: 215,
     })),
+    resolveCover: vi.fn(async (id: string) => `https://i.ytimg.com/vi/${id}/sddefault.jpg`),
     extractPalette: vi.fn(async (): Promise<RawPalette> => ({
       vibrant: '#7c5cff',
       darkVibrant: '#2a1f55',
@@ -31,7 +32,7 @@ describe('resolveSongWith', () => {
     const song = await resolveSongWith('abc12345678', deps);
 
     expect(deps.getMeta).toHaveBeenCalledWith('abc12345678');
-    // cover URL is the maxres thumbnail for the id
+    // cover URL is the best-available thumbnail for the id (fallback chain)
     expect(song.cover).toContain('abc12345678');
     expect(song.id).toBe('abc12345678');
     expect(song.artist).toBe('IU');

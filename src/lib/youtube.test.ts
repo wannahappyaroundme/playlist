@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseVideoId,
   thumbnailUrl,
   THUMB_FALLBACK,
   parseTitleHeuristic,
+  resolveBestThumbnail,
 } from './youtube';
 
 describe('parseVideoId', () => {
@@ -80,6 +81,56 @@ describe('THUMB_FALLBACK', () => {
     for (const q of THUMB_FALLBACK) {
       expect(thumbnailUrl(ID, q)).toBe(`https://i.ytimg.com/vi/${ID}/${q}.jpg`);
     }
+  });
+});
+
+describe('resolveBestThumbnail', () => {
+  const ID = 'dQw4w9WgXcQ';
+  // fake image loader: map URL -> naturalWidth, or reject (load error)
+  const loader = (widths: Record<string, number>) =>
+    vi.fn(async (url: string) => {
+      const w = widths[url];
+      if (w === undefined) throw new Error('404');
+      return { naturalWidth: w, naturalHeight: Math.round((w * 9) / 16) } as HTMLImageElement;
+    });
+
+  it('returns the first quality that loads with a real image', async () => {
+    const load = loader({
+      [thumbnailUrl(ID, 'maxresdefault')]: 1280,
+    });
+    expect(await resolveBestThumbnail(ID, load)).toBe(thumbnailUrl(ID, 'maxresdefault'));
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls through on load error (404) to the next quality', async () => {
+    const load = loader({
+      // maxres + sd 404 (absent), hq exists
+      [thumbnailUrl(ID, 'hqdefault')]: 480,
+    });
+    expect(await resolveBestThumbnail(ID, load)).toBe(thumbnailUrl(ID, 'hqdefault'));
+  });
+
+  it('treats a placeholder (naturalWidth <= 120) as failure and falls through', async () => {
+    const load = loader({
+      [thumbnailUrl(ID, 'maxresdefault')]: 120, // grey placeholder
+      [thumbnailUrl(ID, 'sddefault')]: 640,
+    });
+    expect(await resolveBestThumbnail(ID, load)).toBe(thumbnailUrl(ID, 'sddefault'));
+  });
+
+  it('falls back to hqdefault when every quality fails', async () => {
+    const load = loader({}); // all reject
+    expect(await resolveBestThumbnail(ID, load)).toBe(thumbnailUrl(ID, 'hqdefault'));
+  });
+
+  it('tries qualities in THUMB_FALLBACK order', async () => {
+    const seen: string[] = [];
+    const load = vi.fn(async (url: string) => {
+      seen.push(url);
+      throw new Error('404');
+    });
+    await resolveBestThumbnail(ID, load);
+    expect(seen).toEqual(THUMB_FALLBACK.map((q) => thumbnailUrl(ID, q)));
   });
 });
 

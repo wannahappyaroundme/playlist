@@ -56,6 +56,41 @@ export function thumbnailUrl(videoId: string, quality: ThumbQuality = 'maxresdef
   return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
 }
 
+// ytimg placeholder('찾을 수 없음')는 120x90. naturalWidth가 이 이하면 무효로 간주.
+const PLACEHOLDER_MAX_WIDTH = 120;
+
+function defaultThumbLoader(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`thumbnail load failed: ${url}`));
+    img.src = url;
+  });
+}
+
+/**
+ * THUMB_FALLBACK(maxres→sd→hq→mq) 순서로 시도해 처음으로 '진짜' 이미지가 로드되는
+ * quality URL을 반환한다. 로드 실패(404) 또는 placeholder(naturalWidth ≤ 120)는 실패로 보고
+ * 다음 품질로 넘어간다. 전부 실패하면 거의 항상 존재하는 hqdefault를 최후 보루로 반환.
+ * 커버 표시와 색추출 양쪽에서 같은 URL을 쓰기 위한 순수 선택 로직(로더 주입 가능).
+ */
+export async function resolveBestThumbnail(
+  videoId: string,
+  load: (url: string) => Promise<HTMLImageElement> = defaultThumbLoader,
+): Promise<string> {
+  for (const q of THUMB_FALLBACK) {
+    const url = thumbnailUrl(videoId, q);
+    try {
+      const img = await load(url);
+      if ((img.naturalWidth || 0) > PLACEHOLDER_MAX_WIDTH) return url;
+    } catch {
+      /* try next quality */
+    }
+  }
+  return thumbnailUrl(videoId, 'hqdefault');
+}
+
 export interface ParsedTitle {
   artist: string;
   title: string;

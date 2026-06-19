@@ -44,6 +44,7 @@ function makeDeps(over: Partial<ResolveDeps> = {}): ResolveDeps {
       durationSec: 215,
       metaReady: true,
     })),
+    resolveCover: vi.fn(async (id: string) => `https://i.ytimg.com/vi/${id}/sddefault.jpg`),
     extractPalette: vi.fn(async (): Promise<RawPalette> => ({ vibrant: '#7c5cff' })),
     fetchLyrics: vi.fn(async () => null),
     saveSong: vi.fn(),
