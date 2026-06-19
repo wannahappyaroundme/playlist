@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hexToRgb, rgbToHex } from './colors';
 import { rgbToHsl, hslToRgb } from './colors';
+import { relativeLuminance, contrastRatio } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -73,5 +74,31 @@ describe('hsl round-trip', () => {
       expect(back[1]).toBeCloseTo(c[1], -0.5);
       expect(back[2]).toBeCloseTo(c[2], -0.5);
     }
+  });
+});
+
+describe('relativeLuminance', () => {
+  it('white is 1', () => {
+    expect(relativeLuminance('#ffffff')).toBeCloseTo(1, 5);
+  });
+  it('black is 0', () => {
+    expect(relativeLuminance('#000000')).toBeCloseTo(0, 5);
+  });
+  it('mid gray (#777) approx 0.183', () => {
+    expect(relativeLuminance('#777777')).toBeCloseTo(0.183, 2);
+  });
+});
+
+describe('contrastRatio', () => {
+  it('white vs black is 21', () => {
+    expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 1);
+  });
+  it('is symmetric', () => {
+    const a = contrastRatio('#123456', '#ffffff');
+    const b = contrastRatio('#ffffff', '#123456');
+    expect(a).toBeCloseTo(b, 6);
+  });
+  it('same color is 1', () => {
+    expect(contrastRatio('#abcdef', '#abcdef')).toBeCloseTo(1, 5);
   });
 });
