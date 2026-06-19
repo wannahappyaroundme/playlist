@@ -26,7 +26,7 @@ vi.mock('../hooks/useLyricSync', () => ({ useLyricSync: () => 0 }));
 const playback = {
   queue: [song('s0')], currentIndex: 0, current: song('s0'),
   isPlaying: false, repeat: 'off' as const, progress: 0, duration: 100, started: false,
-  playQueue: vi.fn(), togglePlay: vi.fn(), next: vi.fn(), prev: vi.fn(),
+  playQueue: vi.fn(), start: vi.fn(), togglePlay: vi.fn(), next: vi.fn(), prev: vi.fn(),
   seek: vi.fn(), cycleRepeat: vi.fn(), setRepeat: vi.fn(), getCurrentTime: () => 0,
 };
 vi.mock('../playback/PlaybackContext', () => ({ usePlayback: () => playback }));

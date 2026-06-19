@@ -48,6 +48,7 @@ export interface PlaybackApi {
   duration: number;
   started: boolean;
   playQueue(songs: Song[], startIndex?: number): void;
+  start(): void;
   togglePlay(): void;
   next(): void;
   prev(): void;
@@ -128,14 +129,20 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
     return () => window.clearInterval(id);
   }, [isPlaying]);
 
+  // 큐를 준비(cue)만 한다. 자동재생/게이트 해제는 하지 않음 — 첫 제스처(start)가 소유한다.
   const playQueue = useCallback((songs: Song[], startIndex = 0) => {
     setQueue(songs);
     queueRef.current = songs;
     setCurrentIndex(startIndex);
     indexRef.current = startIndex;
-    setStarted(true);
     const target = songs[startIndex];
-    if (target) playerRef.current?.loadVideoById(target.id);
+    if (target) playerRef.current?.cueVideoById(target.id);
+  }, []);
+
+  // 첫 사용자 제스처: 게이트를 열고 현재 곡을 재생한다.
+  const start = useCallback(() => {
+    setStarted(true);
+    playerRef.current?.playVideo();
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -185,6 +192,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       duration,
       started,
       playQueue,
+      start,
       togglePlay,
       next,
       prev,
@@ -195,7 +203,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
     }),
     [
       queue, currentIndex, current, isPlaying, repeat, progress, duration, started,
-      playQueue, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime,
+      playQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime,
     ],
   );
 

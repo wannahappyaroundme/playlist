@@ -87,7 +87,7 @@ export default function SharedView() {
           불러오는 중…
         </div>
       ) : !playback.started || !current ? (
-        <PlayGate cover={current?.cover ?? ''} colors={colors} message={shared.message} onPlay={playback.togglePlay} />
+        <PlayGate cover={current?.cover ?? ''} colors={colors} message={shared.message} onPlay={playback.start} />
       ) : (
         <div className="relative z-10 grid min-h-screen grid-rows-[1fr_auto] gap-6 px-6 py-8 lg:grid-cols-[46%_54%] lg:grid-rows-1">
           <div className="flex items-center justify-center">

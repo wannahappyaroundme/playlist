@@ -58,12 +58,21 @@ describe('usePlayback state machine (smoke)', () => {
     expect(result.current.repeat).toBe('one');
   });
 
-  it('playQueue populates queue/current and marks started', () => {
+  it('playQueue populates queue/current WITHOUT marking started (no auto-play)', () => {
     const { result } = renderHook(() => usePlayback(), { wrapper });
     act(() => result.current.playQueue([song('a1'), song('b2'), song('c3')], 1));
     expect(result.current.queue.map((s) => s.id)).toEqual(['a1', 'b2', 'c3']);
     expect(result.current.currentIndex).toBe(1);
     expect(result.current.current?.id).toBe('b2');
+    // gate must remain closed until a user gesture calls start()
+    expect(result.current.started).toBe(false);
+  });
+
+  it('start() marks started (first user gesture owns playback start)', () => {
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    act(() => result.current.playQueue([song('a1'), song('b2')], 0));
+    expect(result.current.started).toBe(false);
+    act(() => result.current.start());
     expect(result.current.started).toBe(true);
   });
 

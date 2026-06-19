@@ -59,7 +59,7 @@ export default function Player() {
         <PlayGate
           cover={current?.cover ?? ''}
           colors={colors}
-          onPlay={playback.togglePlay}
+          onPlay={playback.start}
         />
       ) : (
         <div className="relative z-10 grid min-h-screen grid-rows-[1fr_auto] gap-6 px-6 py-8 lg:grid-cols-[46%_54%] lg:grid-rows-1">
