@@ -17,7 +17,7 @@ const mk = (id: string): Playlist => ({
 });
 
 describe('usePlaylists', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('exposes playlists from storage on mount', () => {
     (storage.loadPlaylists as any).mockReturnValue([mk('a'), mk('b')]);
