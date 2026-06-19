@@ -5,6 +5,7 @@ import { relativeLuminance, contrastRatio } from './colors';
 import { clampLightness } from './colors';
 import { ensureReadableOnWhite } from './colors';
 import { quantize } from './colors';
+import { buildSongColors, FALLBACK_COLORS } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -198,5 +199,44 @@ describe('quantize', () => {
   it('returns empty palette for empty pixels', () => {
     const pal = quantize(new Uint8ClampedArray(0), 1);
     expect(pal).toEqual({});
+  });
+});
+
+const HEX = /^#[0-9a-f]{6}$/;
+
+describe('FALLBACK_COLORS', () => {
+  it('has three valid hex fields', () => {
+    expect(FALLBACK_COLORS.gradientFrom).toMatch(HEX);
+    expect(FALLBACK_COLORS.gradientTo).toMatch(HEX);
+    expect(FALLBACK_COLORS.accent).toMatch(HEX);
+  });
+  it('gradient base is dark enough for white text', () => {
+    expect(contrastRatio(FALLBACK_COLORS.gradientFrom, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('buildSongColors', () => {
+  it('returns three valid hex fields', () => {
+    const out = buildSongColors({ vibrant: '#22c2a3', darkVibrant: '#0d4f43', muted: '#5a6a66' });
+    expect(out.gradientFrom).toMatch(HEX);
+    expect(out.gradientTo).toMatch(HEX);
+    expect(out.accent).toMatch(HEX);
+  });
+  it('gradientFrom is readable under white text (contrast >= 4.5)', () => {
+    const out = buildSongColors({ vibrant: '#ffd400', lightVibrant: '#fff6b0' }); // very bright source
+    expect(contrastRatio(out.gradientFrom, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+  it('gradientTo is darker than (or equal to) gradientFrom', () => {
+    const out = buildSongColors({ vibrant: '#3a7fbf', darkVibrant: '#16314a' });
+    const lFrom = rgbToHsl(...hexToRgb(out.gradientFrom))[2];
+    const lTo = rgbToHsl(...hexToRgb(out.gradientTo))[2];
+    expect(lTo).toBeLessThanOrEqual(lFrom + 0.001);
+  });
+  it('accent prefers vibrant when present', () => {
+    const out = buildSongColors({ vibrant: '#e91e63', darkVibrant: '#222' });
+    expect(out.accent).toBe('#e91e63');
+  });
+  it('falls back to FALLBACK_COLORS when palette is empty', () => {
+    expect(buildSongColors({})).toEqual(FALLBACK_COLORS);
   });
 });

@@ -164,3 +164,32 @@ export function quantize(pixels: Uint8ClampedArray, sampleStep = 4): RawPalette 
   });
   return palette;
 }
+
+export const FALLBACK_COLORS: SongColors = {
+  gradientFrom: '#1b1438', // deep navy/purple
+  gradientTo: '#0c0a1f',
+  accent: '#7c6cff',
+};
+
+export function buildSongColors(palette: RawPalette): SongColors {
+  const hasAny =
+    palette.vibrant || palette.darkVibrant || palette.lightVibrant ||
+    palette.muted || palette.darkMuted;
+  if (!hasAny) return { ...FALLBACK_COLORS };
+
+  // base: prefer a darker representative for the gradient
+  const baseRaw =
+    palette.darkVibrant || palette.darkMuted || palette.muted ||
+    palette.vibrant || palette.lightVibrant!;
+  // clamp into a dark-but-colored range, then guarantee white-text readability
+  const clamped = clampLightness(baseRaw, 0.12, 0.32);
+  const gradientFrom = ensureReadableOnWhite(clamped, 4.5);
+  // gradientTo: noticeably darker than gradientFrom
+  const gradientTo = clampLightness(gradientFrom, 0.05, 0.18);
+  // accent: the most vivid available, otherwise the base
+  const accent =
+    palette.vibrant || palette.lightVibrant || palette.darkVibrant ||
+    palette.muted || palette.darkMuted || gradientFrom;
+
+  return { gradientFrom, gradientTo, accent };
+}
