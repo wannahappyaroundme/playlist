@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { hexToRgb, rgbToHex } from './colors';
+import { rgbToHsl, hslToRgb } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -31,5 +32,46 @@ describe('rgbToHex', () => {
 describe('round-trip', () => {
   it('hexToRgb -> rgbToHex preserves value', () => {
     expect(rgbToHex(...hexToRgb('#13c2a3'))).toBe('#13c2a3');
+  });
+});
+
+describe('rgbToHsl', () => {
+  it('pure red -> h=0 s=1 l=0.5', () => {
+    const [h, s, l] = rgbToHsl(255, 0, 0);
+    expect(h).toBeCloseTo(0, 5);
+    expect(s).toBeCloseTo(1, 5);
+    expect(l).toBeCloseTo(0.5, 5);
+  });
+  it('pure green -> h=120', () => {
+    expect(rgbToHsl(0, 255, 0)[0]).toBeCloseTo(120, 5);
+  });
+  it('pure blue -> h=240', () => {
+    expect(rgbToHsl(0, 0, 255)[0]).toBeCloseTo(240, 5);
+  });
+  it('gray is achromatic: s=0', () => {
+    const [, s, l] = rgbToHsl(128, 128, 128);
+    expect(s).toBeCloseTo(0, 5);
+    expect(l).toBeCloseTo(128 / 255, 5);
+  });
+});
+
+describe('hslToRgb', () => {
+  it('h=0 s=1 l=0.5 -> pure red', () => {
+    expect(hslToRgb(0, 1, 0.5)).toEqual([255, 0, 0]);
+  });
+  it('s=0 -> gray regardless of hue', () => {
+    expect(hslToRgb(200, 0, 0.5)).toEqual([128, 128, 128]);
+  });
+});
+
+describe('hsl round-trip', () => {
+  it('rgb -> hsl -> rgb is stable for sample colors', () => {
+    for (const c of [[18, 194, 163], [255, 136, 0], [60, 20, 90]] as const) {
+      const [h, s, l] = rgbToHsl(c[0], c[1], c[2]);
+      const back = hslToRgb(h, s, l);
+      expect(back[0]).toBeCloseTo(c[0], -0.5);
+      expect(back[1]).toBeCloseTo(c[1], -0.5);
+      expect(back[2]).toBeCloseTo(c[2], -0.5);
+    }
   });
 });
