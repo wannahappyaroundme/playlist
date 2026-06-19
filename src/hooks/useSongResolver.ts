@@ -4,7 +4,7 @@ import { parseTitleHeuristic, thumbnailUrl } from '../lib/youtube';
 import { buildSongColors, FALLBACK_COLORS, extractPalette, type RawPalette } from '../lib/colors';
 import { fetchLyrics } from '../lib/lrclib';
 import { saveSong } from '../lib/storage';
-import { createYtPlayer, YT_STATE, type YtPlayer } from '../lib/ytPlayer';
+import { createYtPlayer, type YtPlayer } from '../lib/ytPlayer';
 import type { LrclibResponse } from '../lib/lrclib';
 import type { Song, SongColors, SongLyrics } from '../types';
 
@@ -52,13 +52,35 @@ export function assembleSong(input: AssembleSongInput): Song {
   };
 }
 
+export interface ProbeMeta {
+  video_id: string;
+  title: string;
+  author: string;
+  durationSec: number;
+  /**
+   * true면 video_id/title/duration이 모두 채워진 신뢰 가능한 메타다.
+   * false면 8s 타임아웃까지 title/duration을 받지 못한 것 → 빈 메타로 캐시 고착을 막기 위해
+   * resolveSongWith가 저장하지 않고 throw한다. (undefined = 레거시/주입 테스트, 신뢰 처리)
+   */
+  metaReady?: boolean;
+}
+
+/**
+ * 프로브 폴링 종료 조건(순수). title까지 채워져야 finish하며, CUED 상태 단독으로는 끝내지 않는다.
+ * 타임아웃(elapsed > timeoutMs)이면 메타가 비어도 종료해 행을 막는다.
+ */
+export function metaPollDone(
+  data: { video_id?: string; title?: string } | null | undefined,
+  dur: number,
+  elapsed: number,
+  timeoutMs: number,
+): boolean {
+  if (elapsed > timeoutMs) return true;
+  return !!(data && data.video_id && data.title && dur > 0);
+}
+
 export interface ResolveDeps {
-  getMeta(videoId: string): Promise<{
-    video_id: string;
-    title: string;
-    author: string;
-    durationSec: number;
-  }>;
+  getMeta(videoId: string): Promise<ProbeMeta>;
   extractPalette(coverUrl: string): Promise<RawPalette>;
   fetchLyrics(p: { artist: string; track: string; durationSec: number }): Promise<LrclibResponse | null>;
   saveSong(song: Song): void;
@@ -71,6 +93,10 @@ export interface ResolveDeps {
  */
 export async function resolveSongWith(videoId: string, deps: ResolveDeps): Promise<Song> {
   const meta = await deps.getMeta(videoId);
+  // 빈 메타(타임아웃까지 title/duration 미수신)는 캐시에 고착시키지 않는다.
+  if (meta.metaReady === false) {
+    throw new Error(`metadata unavailable for video ${videoId}`);
+  }
   const cover = thumbnailUrl(videoId);
 
   let colors: SongColors;
@@ -105,6 +131,7 @@ export interface SongResolver {
 }
 
 const PROBE_ELEMENT_ID = 'yejin-probe';
+const META_TIMEOUT_MS = 8000;
 
 /**
  * 메인 재생과 분리된 프로브 YtPlayer 1개로 메타를 읽어 곡을 resolve한다.
@@ -142,14 +169,13 @@ export function useSongResolver(): SongResolver {
           settled = true;
           resolve();
         };
-        // poll until metadata is populated after cue
+        // poll until metadata is populated after cue (CUED alone is NOT done)
         probe.cueVideoById(videoId);
         const start = Date.now();
         const poll = () => {
           const data = probe.getVideoData();
           const dur = probe.getDuration();
-          const state = probe.getPlayerState();
-          if ((data && data.video_id && dur > 0) || state === YT_STATE.CUED || Date.now() - start > 8000) {
+          if (metaPollDone(data, dur, Date.now() - start, META_TIMEOUT_MS)) {
             finish();
           } else {
             setTimeout(poll, 100);
@@ -158,11 +184,16 @@ export function useSongResolver(): SongResolver {
         poll();
       });
       const data = probe.getVideoData();
+      const dur = probe.getDuration() || 0;
+      const title = data.title || '';
+      // metaReady: title + duration까지 받았는지(타임아웃 빈-메타 식별용)
+      const metaReady = !!(data.video_id && title && dur > 0);
       return {
         video_id: data.video_id || videoId,
-        title: data.title || '',
+        title,
         author: data.author || '',
-        durationSec: probe.getDuration() || 0,
+        durationSec: dur,
+        metaReady,
       };
     },
     [ensureProbe],
