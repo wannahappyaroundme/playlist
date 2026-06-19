@@ -3,6 +3,7 @@ import { hexToRgb, rgbToHex } from './colors';
 import { rgbToHsl, hslToRgb } from './colors';
 import { relativeLuminance, contrastRatio } from './colors';
 import { clampLightness } from './colors';
+import { ensureReadableOnWhite } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -125,5 +126,23 @@ describe('clampLightness', () => {
     expect(l1).toBeCloseTo(l0, 1);
     expect(h1).toBeCloseTo(h0, 0);
     expect(s1).toBeCloseTo(s0, 1);
+  });
+});
+
+describe('ensureReadableOnWhite', () => {
+  it('darkens a bright color until white text contrast >= 4.5', () => {
+    const out = ensureReadableOnWhite('#ffd400'); // bright yellow, very low contrast vs white
+    expect(contrastRatio(out, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+  it('respects a custom higher minRatio', () => {
+    const out = ensureReadableOnWhite('#33aa55', 7);
+    expect(contrastRatio(out, '#ffffff')).toBeGreaterThanOrEqual(7);
+  });
+  it('leaves already-dark color unchanged enough to keep contrast', () => {
+    const out = ensureReadableOnWhite('#101820');
+    expect(contrastRatio(out, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+  it('returns a valid hex string', () => {
+    expect(ensureReadableOnWhite('#abcdef')).toMatch(/^#[0-9a-f]{6}$/);
   });
 });

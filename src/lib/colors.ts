@@ -80,3 +80,16 @@ export function clampLightness(hex: string, minL: number, maxL: number): string 
   const cl = Math.max(minL, Math.min(maxL, l));
   return rgbToHex(...hslToRgb(h, s, cl));
 }
+
+export function ensureReadableOnWhite(bgHex: string, minRatio = 4.5): string {
+  const [h, s] = rgbToHsl(...hexToRgb(bgHex));
+  let l = rgbToHsl(...hexToRgb(bgHex))[2];
+  let hex = rgbToHex(...hslToRgb(h, s, l));
+  // step down lightness until white text reaches the target contrast (or fully black)
+  for (let i = 0; i < 100 && contrastRatio(hex, '#ffffff') < minRatio; i++) {
+    l = Math.max(0, l - 0.02);
+    hex = rgbToHex(...hslToRgb(h, s, l));
+    if (l <= 0) break;
+  }
+  return hex;
+}
