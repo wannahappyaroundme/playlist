@@ -3,6 +3,7 @@ import type { Playlist, Song } from '../types';
 import {
   PLAYLISTS_KEY,
   SONGS_KEY,
+  createPlaylist,
   deletePlaylist,
   getPlaylist,
   getSong,
@@ -155,5 +156,34 @@ describe('makeSlug', () => {
   it('default rand produces a 4-char alnum suffix', () => {
     const slug = makeSlug('abc');
     expect(slug).toMatch(/^abc-[a-z0-9]{4}$/);
+  });
+});
+
+describe('createPlaylist', () => {
+  it('builds a deterministic playlist from injected now/rand', () => {
+    const p = createPlaylist('Night Lounge', {
+      now: () => '2026-06-20T12:00:00.000Z',
+      rand: () => 'abcd',
+    });
+    expect(p).toEqual({
+      id: 'night-lounge-abcd',
+      title: 'Night Lounge',
+      songIds: [],
+      createdAt: '2026-06-20T12:00:00.000Z',
+    });
+  });
+
+  it('uses current ISO time when now is not injected', () => {
+    const before = Date.now();
+    const p = createPlaylist('x', { rand: () => 'rrrr' });
+    const created = Date.parse(p.createdAt);
+    expect(created).toBeGreaterThanOrEqual(before);
+    expect(p.id).toBe('x-rrrr');
+    expect(p.songIds).toEqual([]);
+  });
+
+  it('does not persist by itself (loadPlaylists stays empty)', () => {
+    createPlaylist('y', { rand: () => 'zzzz' });
+    expect(loadPlaylists()).toEqual([]);
   });
 });

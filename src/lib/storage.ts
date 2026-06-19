@@ -76,3 +76,15 @@ export function makeSlug(title: string, rand: () => string = randSuffix): string
     'list';
   return `${stem}-${rand()}`;
 }
+
+export function createPlaylist(
+  title: string,
+  opts: { now?: () => string; rand?: () => string } = {},
+): Playlist {
+  return {
+    id: makeSlug(title, opts.rand),
+    title,
+    songIds: [],
+    createdAt: opts.now ? opts.now() : new Date().toISOString(),
+  };
+}
