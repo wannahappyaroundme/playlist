@@ -193,3 +193,44 @@ export function buildSongColors(palette: RawPalette): SongColors {
 
   return { gradientFrom, gradientTo, accent };
 }
+
+function defaultLoadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`image load failed: ${url}`));
+    img.src = url;
+  });
+}
+
+export async function extractPalette(
+  imageUrl: string,
+  loadImage: (url: string) => Promise<HTMLImageElement> = defaultLoadImage,
+): Promise<RawPalette> {
+  const img = await loadImage(imageUrl);
+  const w = img.naturalWidth || img.width || 0;
+  const h = img.naturalHeight || img.height || 0;
+  if (!w || !h) throw new Error('image has no dimensions');
+
+  // downscale for speed
+  const maxSide = 100;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const cw = Math.max(1, Math.round(w * scale));
+  const ch = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2d context unavailable');
+  ctx.drawImage(img, 0, 0, cw, ch);
+
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, cw, ch).data; // throws if canvas is tainted (CORS)
+  } catch {
+    throw new Error('canvas tainted or pixel read failed');
+  }
+  return quantize(data, 1);
+}

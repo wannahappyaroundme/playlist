@@ -6,6 +6,7 @@ import { clampLightness } from './colors';
 import { ensureReadableOnWhite } from './colors';
 import { quantize } from './colors';
 import { buildSongColors, FALLBACK_COLORS } from './colors';
+import { extractPalette } from './colors';
 
 describe('hexToRgb', () => {
   it('parses 6-digit hex with leading #', () => {
@@ -238,5 +239,19 @@ describe('buildSongColors', () => {
   });
   it('falls back to FALLBACK_COLORS when palette is empty', () => {
     expect(buildSongColors({})).toEqual(FALLBACK_COLORS);
+  });
+});
+
+describe('extractPalette (injected loadImage)', () => {
+  it('throws when loadImage rejects (load failure)', async () => {
+    const failingLoad = async () => { throw new Error('load failed'); };
+    await expect(extractPalette('http://example.com/x.jpg', failingLoad)).rejects.toThrow();
+  });
+
+  it('throws when canvas 2D context / pixel read is unavailable (jsdom)', async () => {
+    // fake image; in jsdom getContext('2d') returns null or getImageData throws -> extractPalette must throw
+    const fakeImg = { width: 10, height: 10, naturalWidth: 10, naturalHeight: 10 } as unknown as HTMLImageElement;
+    const fakeLoad = async () => fakeImg;
+    await expect(extractPalette('http://example.com/x.jpg', fakeLoad)).rejects.toThrow();
   });
 });
