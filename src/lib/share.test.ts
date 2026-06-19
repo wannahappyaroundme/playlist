@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SharedPlaylist } from '../types';
-import { encodePlaylist } from './share';
+import { decodePlaylist, encodePlaylist } from './share';
 
 const sample: SharedPlaylist = {
   title: '심야의 라운지',
@@ -23,5 +23,43 @@ describe('encodePlaylist', () => {
     const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
     const json = new TextDecoder().decode(bytes);
     expect(JSON.parse(json)).toEqual(sample);
+  });
+});
+
+describe('decodePlaylist', () => {
+  it('round-trips an encoded playlist back to an equal object', () => {
+    expect(decodePlaylist(encodePlaylist(sample))).toEqual(sample);
+  });
+
+  it('round-trips a minimal playlist (no message, no song titles)', () => {
+    const minimal: SharedPlaylist = { title: 'x', songs: [{ id: 'aaaaaaaaaaa' }] };
+    expect(decodePlaylist(encodePlaylist(minimal))).toEqual(minimal);
+  });
+
+  it('returns null for invalid base64url input', () => {
+    expect(decodePlaylist('!!!not base64!!!')).toBeNull();
+  });
+
+  it('returns null when decoded JSON is not valid JSON', () => {
+    // "{" encoded as base64url -> not a complete object
+    const b64 = btoa('{').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    expect(decodePlaylist(b64)).toBeNull();
+  });
+
+  it('returns null when shape is not a SharedPlaylist', () => {
+    const enc = (obj: unknown) =>
+      btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    expect(decodePlaylist(enc({ foo: 'bar' }))).toBeNull(); // no title/songs
+    expect(decodePlaylist(enc({ title: 'x', songs: 'nope' }))).toBeNull(); // songs not array
+    expect(decodePlaylist(enc({ title: 1, songs: [] }))).toBeNull(); // title not string
+    expect(decodePlaylist(enc(['array']))).toBeNull(); // not an object
+    expect(decodePlaylist(enc(null))).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(decodePlaylist('')).toBeNull();
   });
 });

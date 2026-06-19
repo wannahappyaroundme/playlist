@@ -13,3 +13,41 @@ export function encodePlaylist(p: SharedPlaylist): string {
   const bytes = new TextEncoder().encode(json);
   return bytesToBase64Url(bytes);
 }
+
+function base64UrlToBytes(encoded: string): Uint8Array {
+  const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  const bin = atob(padded);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function isSharedPlaylist(v: unknown): v is SharedPlaylist {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.title !== 'string') return false;
+  if (o.message !== undefined && typeof o.message !== 'string') return false;
+  if (!Array.isArray(o.songs)) return false;
+  return o.songs.every((s) => {
+    if (typeof s !== 'object' || s === null) return false;
+    const so = s as Record<string, unknown>;
+    if (typeof so.id !== 'string') return false;
+    if (so.title !== undefined && typeof so.title !== 'string') return false;
+    return true;
+  });
+}
+
+export function decodePlaylist(encoded: string): SharedPlaylist | null {
+  if (!encoded) return null;
+  try {
+    const bytes = base64UrlToBytes(encoded);
+    const json = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(json);
+    return isSharedPlaylist(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
