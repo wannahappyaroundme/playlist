@@ -54,6 +54,17 @@ export function errorAction(
   return { kind: 'play', index: idx };
 }
 
+/**
+ * 플레이어 상태 → isPlaying 매핑(순수). PLAYING/PAUSED/ENDED만 확정값을 주고,
+ * BUFFERING/UNSTARTED/CUED는 null(변경 없음)을 반환해 곡 전환·버퍼링마다
+ * 진행바/LP/가사가 멈췄다 재시작하는 깜빡임을 막는다.
+ */
+export function isPlayingFromState(state: number): boolean | null {
+  if (state === YT_STATE.PLAYING) return true;
+  if (state === YT_STATE.PAUSED || state === YT_STATE.ENDED) return false;
+  return null; // BUFFERING / UNSTARTED / CUED → no change
+}
+
 export interface PlaybackApi {
   queue: Song[];
   currentIndex: number;
@@ -108,18 +119,18 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
     let alive = true;
     createYtPlayer(PLAYER_ELEMENT_ID, {
       onStateChange: (state) => {
-        if (state === YT_STATE.PLAYING) setIsPlaying(true);
-        else if (state === YT_STATE.PAUSED || state === YT_STATE.BUFFERING) setIsPlaying(false);
-        else if (state === YT_STATE.ENDED) {
+        // BUFFERING/UNSTARTED/CUED는 isPlaying을 건드리지 않는다(곡 전환 깜빡임 방지).
+        const playing = isPlayingFromState(state);
+        if (playing !== null) setIsPlaying(playing);
+        if (state === YT_STATE.ENDED) {
           const action = endedAction(indexRef.current, queueRef.current.length, repeatRef.current);
           if (action.kind === 'replay') {
             playerRef.current?.seekTo(0);
             playerRef.current?.playVideo();
           } else if (action.kind === 'play') {
             goTo(action.index);
-          } else {
-            setIsPlaying(false);
           }
+          // 'stop'은 위에서 이미 isPlaying=false 처리됨
         }
       },
       onError: () => {
