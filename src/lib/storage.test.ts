@@ -8,6 +8,7 @@ import {
   getSong,
   loadPlaylists,
   loadSongs,
+  makeSlug,
   savePlaylist,
   saveSong,
 } from './storage';
@@ -124,5 +125,35 @@ describe('playlist CRUD', () => {
     savePlaylist(makePlaylist({ id: 'a-1111' }));
     deletePlaylist('nope');
     expect(loadPlaylists()).toHaveLength(1);
+  });
+});
+
+describe('makeSlug', () => {
+  const rand = () => 'wxyz';
+
+  it('lowercases ascii and joins words with hyphens, appending rand suffix', () => {
+    expect(makeSlug('My Cool Mix', rand)).toBe('my-cool-mix-wxyz');
+  });
+
+  it('keeps Korean characters and collapses spaces', () => {
+    expect(makeSlug('예진 플레이리스트', rand)).toBe('예진-플레이리스트-wxyz');
+  });
+
+  it('strips punctuation and other symbols', () => {
+    expect(makeSlug('Hello, World! (2026)', rand)).toBe('hello-world-2026-wxyz');
+  });
+
+  it('collapses repeated and trims edge separators', () => {
+    expect(makeSlug('  ---night   lounge---  ', rand)).toBe('night-lounge-wxyz');
+  });
+
+  it('falls back to "list" stem when nothing usable remains', () => {
+    expect(makeSlug('!!!', rand)).toBe('list-wxyz');
+    expect(makeSlug('', rand)).toBe('list-wxyz');
+  });
+
+  it('default rand produces a 4-char alnum suffix', () => {
+    const slug = makeSlug('abc');
+    expect(slug).toMatch(/^abc-[a-z0-9]{4}$/);
   });
 });

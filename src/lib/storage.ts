@@ -56,3 +56,23 @@ export function deletePlaylist(id: string): void {
   const all = loadPlaylists().filter((p) => p.id !== id);
   writeJson(PLAYLISTS_KEY, all);
 }
+
+function randSuffix(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let out = '';
+  for (let i = 0; i < 4; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+export function makeSlug(title: string, rand: () => string = randSuffix): string {
+  const stem =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣\s-]/g, '') // keep ascii alnum, Hangul, space, hyphen
+      .replace(/[\s-]+/g, '-') // collapse spaces/hyphens to single hyphen
+      .replace(/^-+|-+$/g, '') || // trim edge hyphens
+    'list';
+  return `${stem}-${rand()}`;
+}
