@@ -3,11 +3,15 @@ import { estimateTime, type TimeSample } from '../lib/time';
 import { findActiveIndex } from '../lib/lrc';
 import type { LyricLine } from '../types';
 
+// 추정 시각이 마지막 줄 시각 + 이 여유(초)를 넘으면 '이전 곡의 잔여 위치'로 간주(stale).
+const STALE_GRACE_SEC = 2;
+
 /**
  * 보간된 재생 시각으로 활성 가사 인덱스를 계산하는 순수 헬퍼.
  * estimateTime(sample, now, playing)로 현재 재생초를 추정하고,
  * offsetMs/1000을 더해 보정한 뒤 findActiveIndex로 인덱스를 찾는다.
  * 첫 줄 전이면 -1, 빈 lines면 -1.
+ * 곡 전환 직후 stale 샘플(마지막 줄 시각 + 2s 초과)이면 -1로 둬 끝줄로 튀는 것을 막는다.
  */
 export function computeActiveIndex(
   sample: TimeSample,
@@ -18,6 +22,9 @@ export function computeActiveIndex(
 ): number {
   if (lines.length === 0) return -1;
   const t = estimateTime(sample, now, playing) + offsetMs / 1000;
+  const lastLineTime = lines[lines.length - 1].time;
+  // 이전 곡 위치로 추정되는 stale 샘플: 시간이 정상 범위로 돌아올 때까지 활성 인덱스 보류.
+  if (t > lastLineTime + STALE_GRACE_SEC) return -1;
   return findActiveIndex(lines, t);
 }
 

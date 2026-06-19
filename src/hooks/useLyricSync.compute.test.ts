@@ -37,4 +37,16 @@ describe('computeActiveIndex', () => {
     const idx = computeActiveIndex({ time: 99, at: 0 }, 0, true, [], 0);
     expect(idx).toBe(-1);
   });
+
+  it('returns -1 when the time is stale (beyond last line + 2s) — song-change guard', () => {
+    // last line time = 10; sample at 200s = previous song's leftover position
+    const idx = computeActiveIndex({ time: 200, at: 1000 }, 1000, false, lines, 0);
+    expect(idx).toBe(-1);
+  });
+
+  it('stays valid right up to the 2s grace beyond the last line', () => {
+    // last line = 10; t=12 is within +2s grace → still the last index, not stale
+    const idx = computeActiveIndex({ time: 12, at: 1000 }, 1000, false, lines, 0);
+    expect(idx).toBe(2);
+  });
 });
