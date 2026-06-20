@@ -18,17 +18,17 @@ export default function GradientBg({ colors }: GradientBgProps) {
   // two layers; `front` is which index currently holds the visible color
   const [layers, setLayers] = useState<[SongColors, SongColors]>([colors, colors]);
   const [front, setFront] = useState(0);
-  const initial = useRef(true);
   const frontRef = useRef(0);
+  // Compare against the previous colors value instead of a one-shot "initial"
+  // flag. A StrictMode double-mount re-runs the effect with the same colors, so
+  // the equality guard returns early both times — no spurious crossfade toggle.
+  const prevColorsRef = useRef(colors);
 
   useEffect(() => {
-    if (initial.current) {
-      initial.current = false;
-      return;
-    }
+    if (prevColorsRef.current === colors) return;
+    prevColorsRef.current = colors;
     // paint the new colors onto the back layer, then make it the front.
-    // refs (not stale state) drive the toggle so the update is computed once
-    // and stays correct even under StrictMode double-invocation.
+    // refs (not stale state) drive the toggle so the update is computed once.
     const back = frontRef.current === 0 ? 1 : 0;
     frontRef.current = back;
     setLayers((prev) => {

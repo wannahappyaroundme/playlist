@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { StrictMode } from 'react';
 import { render } from '@testing-library/react';
 import GradientBg from './GradientBg';
 import type { SongColors } from '../types';
@@ -38,5 +39,19 @@ describe('GradientBg', () => {
 
     expect(activeIdxAfter).not.toBe(activeIdxBefore); // role toggled
     expect(after[activeIdxAfter].style.backgroundImage.toLowerCase()).toContain('#300a0a');
+  });
+
+  it('does not toggle the front layer on initial StrictMode double-mount (Fix 19)', () => {
+    const { container } = render(
+      <StrictMode>
+        <GradientBg colors={A} />
+      </StrictMode>,
+    );
+    const layers = Array.from(
+      container.querySelectorAll('[data-testid="gradient-layer"]'),
+    ) as HTMLElement[];
+    // layer 0 stays the visible/front layer (no spurious crossfade toggle)
+    expect(layers[0].style.opacity).toBe('1');
+    expect(layers[1].style.opacity).toBe('0');
   });
 });
