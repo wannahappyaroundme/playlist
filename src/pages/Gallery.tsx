@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { thumbnailUrl } from '../lib/youtube';
-import { getSong } from '../lib/storage';
+import { getSong, exportAll, importAll } from '../lib/storage';
 import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb } from '../lib/colors';
 import AppBackground from '../components/AppBackground';
 
@@ -41,8 +42,9 @@ function CoverThumb({ id, playlistId }: { id?: string; playlistId: string }) {
 }
 
 export default function Gallery() {
-  const { playlists, create, remove } = usePlaylists();
+  const { playlists, create, remove, refresh } = usePlaylists();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleNew = () => {
     const title = '새 플레이리스트';
@@ -56,18 +58,80 @@ export default function Gallery() {
     remove(id);
   };
 
+  // 백업 내보내기: 현재 데이터를 .json 파일로 다운로드한다(Blob + 임시 anchor).
+  const handleExport = () => {
+    try {
+      const json = exportAll();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download = `yejin-playlist-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.alert('내보내기에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  };
+
+  // 백업 가져오기: 숨긴 file input → 텍스트로 읽어 importAll → 목록 새로고침.
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 같은 파일을 다시 골라도 onChange가 또 뜨도록 초기화
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { songs, playlists: plCount } = importAll(text);
+      refresh();
+      window.alert(`가져오기 완료: 곡 ${songs}개, 플레이리스트 ${plCount}개를 불러왔어요.`);
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : '가져오기에 실패했어요. 올바른 백업 파일인지 확인해 주세요.';
+      window.alert(msg);
+    }
+  };
+
   return (
     <div className="min-h-screen px-6 py-10 text-white">
       <AppBackground />
-      <header className="mb-8 flex items-center justify-between">
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">Yejin Playlist</h1>
-        <button
-          type="button"
-          onClick={handleNew}
-          className="rounded-full bg-white/15 px-5 py-2 text-sm backdrop-blur hover:bg-white/25"
-        >
-          새 플레이리스트
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-full bg-white/10 px-4 py-2 text-sm backdrop-blur hover:bg-white/20"
+          >
+            내보내기
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-full bg-white/10 px-4 py-2 text-sm backdrop-blur hover:bg-white/20"
+          >
+            가져오기
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            aria-label="백업 파일 가져오기"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleNew}
+            className="rounded-full bg-white/15 px-5 py-2 text-sm backdrop-blur hover:bg-white/25"
+          >
+            새 플레이리스트
+          </button>
+        </div>
       </header>
 
       {playlists.length === 0 ? (
