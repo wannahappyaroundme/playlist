@@ -18,7 +18,11 @@ vi.mock('../lib/storage', () => ({
   getPlaylist: () => pl, getSong: (id: string) => song(id),
   savePlaylist: vi.fn(), createPlaylist: () => pl,
 }));
-vi.mock('../lib/share', () => ({ encodePlaylist: () => 'ENC', decodePlaylist: () => shared }));
+vi.mock('../lib/share', () => ({
+  encodePlaylist: () => 'ENC',
+  decodePlaylist: () => shared,
+  buildSharePayload: () => ({ encoded: 'ENC', titlesDropped: false }),
+}));
 vi.mock('../hooks/useSongResolver', () => ({
   useSongResolver: () => ({ resolve: async (id: string) => song(id), resolving: false }),
 }));
