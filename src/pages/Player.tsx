@@ -52,7 +52,7 @@ export default function Player() {
   const colors = current?.colors ?? { gradientFrom: '#0b1020', gradientTo: '#05070f', accent: '#6b7cff' };
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-white">
+    <div className="relative h-[100dvh] overflow-hidden text-white">
       <GradientBg colors={colors} />
 
       {!playback.started || !current ? (
@@ -62,11 +62,11 @@ export default function Player() {
           onPlay={playback.start}
         />
       ) : (
-        <div className="relative z-10 grid min-h-screen grid-rows-[1fr_auto] gap-6 px-6 py-8 lg:grid-cols-[46%_54%] lg:grid-rows-1">
-          <div className="flex items-center justify-center">
+        <div className="relative z-10 grid h-[100dvh] grid-rows-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 px-6 py-6 lg:grid-cols-[46%_54%] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-6 lg:px-10 lg:py-8">
+          <div className="flex min-h-0 items-center justify-center">
             <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} />
           </div>
-          <div className="flex items-center justify-center">
+          <div className="flex min-h-0 items-stretch justify-center">
             <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} />
           </div>
           <div className="lg:col-span-2">

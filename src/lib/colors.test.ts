@@ -233,6 +233,14 @@ describe('buildSongColors', () => {
     const lTo = rgbToHsl(...hexToRgb(out.gradientTo))[2];
     expect(lTo).toBeLessThanOrEqual(lFrom + 0.001);
   });
+  it('gradientFrom and gradientTo are never equal, even for a very dark cover', () => {
+    // regression: dark-navy covers used to collapse from===to (flat background)
+    const out = buildSongColors({ darkVibrant: '#0a1433', darkMuted: '#0a1433' });
+    expect(out.gradientFrom).not.toBe(out.gradientTo);
+    const lFrom = rgbToHsl(...hexToRgb(out.gradientFrom))[2];
+    const lTo = rgbToHsl(...hexToRgb(out.gradientTo))[2];
+    expect(lFrom - lTo).toBeGreaterThan(0.02); // a visible two-tone delta
+  });
   it('accent prefers vibrant when present', () => {
     const out = buildSongColors({ vibrant: '#e91e63', darkVibrant: '#222' });
     expect(out.accent).toBe('#e91e63');

@@ -48,11 +48,15 @@ export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
   const lines = lyrics.synced ?? [];
   // activeIndex of -1 (before first line / no synced) keeps the first line centered.
   const safeIndex = activeIndex < 0 ? 0 : activeIndex;
-  const translateY = -(safeIndex * LINE_HEIGHT_EM);
+  // The track is absolutely positioned with its top edge at the pane's vertical
+  // center (top-1/2). Shift it UP by the active line's center offset so the active
+  // line sits exactly at the pane center. Because the track is absolute, its full
+  // (tall) height never inflates the bounded pane — overflow-hidden clips it.
+  const shiftEm = safeIndex * LINE_HEIGHT_EM + LINE_HEIGHT_EM / 2;
 
   return (
     <div
-      className="relative h-full overflow-hidden"
+      className="relative h-full w-full overflow-hidden"
       style={{
         maskImage:
           'linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%)',
@@ -62,9 +66,9 @@ export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
     >
       <div
         data-testid="lyrics-track"
-        className="flex flex-col items-center justify-start motion-safe:transition-transform motion-safe:duration-[450ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="absolute inset-x-0 top-1/2 flex flex-col items-center motion-safe:transition-transform motion-safe:duration-[450ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
-          transform: `translateY(calc(50% + ${translateY}em))`,
+          transform: `translateY(-${shiftEm}em)`,
           willChange: 'transform',
         }}
       >

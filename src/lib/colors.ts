@@ -182,10 +182,14 @@ export function buildSongColors(palette: RawPalette): SongColors {
     palette.darkVibrant || palette.darkMuted || palette.muted ||
     palette.vibrant || palette.lightVibrant!;
   // clamp into a dark-but-colored range, then guarantee white-text readability
-  const clamped = clampLightness(baseRaw, 0.12, 0.32);
+  const clamped = clampLightness(baseRaw, 0.14, 0.32);
   const gradientFrom = ensureReadableOnWhite(clamped, 4.5);
-  // gradientTo: noticeably darker than gradientFrom
-  const gradientTo = clampLightness(gradientFrom, 0.05, 0.18);
+  // gradientTo: ALWAYS a distinctly darker tone than gradientFrom (never equal),
+  // so the background reads as a real two-tone gradient even for very-dark covers.
+  // Scale lightness down and guarantee a minimum delta.
+  const [gh, gs, gl] = rgbToHsl(...hexToRgb(gradientFrom));
+  const toL = Math.max(0.03, Math.min(gl * 0.45, gl - 0.06));
+  const gradientTo = rgbToHex(...hslToRgb(gh, gs, toL));
   // accent: the most vivid available, otherwise the base
   const accent =
     palette.vibrant || palette.lightVibrant || palette.darkVibrant ||
