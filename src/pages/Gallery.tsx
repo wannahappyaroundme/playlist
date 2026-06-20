@@ -51,9 +51,9 @@ export default function Gallery() {
   };
 
   const handleDelete = (id: string, title: string) => {
-    if (window.confirm(`"${title}" 플레이리스트를 삭제할까요?`)) {
-      remove(id);
-    }
+    if (!window.confirm(`"${title}" 플레이리스트를 삭제할까요?`)) return;
+    if (!window.confirm('정말 삭제할까요? 되돌릴 수 없어요.')) return;
+    remove(id);
   };
 
   return (
@@ -86,32 +86,37 @@ export default function Gallery() {
               : undefined;
             return (
             <li key={p.id}>
-              <Link
-                to={`/p/${p.id}`}
+              <div
                 style={cardStyle}
                 className={
-                  'block rounded-2xl p-4 backdrop-blur transition ' +
-                  (baseColor
-                    ? 'ring-1 ring-white/10 hover:brightness-110'
-                    : 'bg-white/10 hover:bg-white/15')
+                  'rounded-2xl p-4 backdrop-blur transition ' +
+                  (baseColor ? 'ring-1 ring-white/10' : 'bg-white/10')
                 }
               >
-                <CoverThumb id={coverId} playlistId={p.id} />
-                <p className="mt-3 truncate text-sm font-medium drop-shadow">{p.title}</p>
-                <p className="mt-1 text-xs text-white/70">{p.songIds.length}곡</p>
-              </Link>
-              <div className="mt-1 flex items-center justify-between">
-                <Link to={`/edit/${p.id}`} className="text-xs text-white/40 hover:text-white/70">
-                  편집
+                <Link to={`/p/${p.id}`} className="block transition hover:opacity-90">
+                  <CoverThumb id={coverId} playlistId={p.id} />
                 </Link>
-                <button
-                  type="button"
-                  aria-label={`${p.title} 삭제`}
-                  onClick={() => handleDelete(p.id, p.title)}
-                  className="text-xs text-white/40 transition hover:text-red-300"
-                >
-                  삭제
-                </button>
+                {/* 제목 옆 편집, 곡수 옆 삭제 */}
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-medium drop-shadow">{p.title}</p>
+                  <Link
+                    to={`/edit/${p.id}`}
+                    className="shrink-0 rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                  >
+                    편집
+                  </Link>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-xs text-white/80">{p.songIds.length}곡</p>
+                  <button
+                    type="button"
+                    aria-label={`${p.title} 삭제`}
+                    onClick={() => handleDelete(p.id, p.title)}
+                    className="shrink-0 rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-red-500/55 hover:text-white"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
             </li>
             );
