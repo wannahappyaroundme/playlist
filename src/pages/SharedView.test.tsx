@@ -22,6 +22,7 @@ vi.mock('../hooks/useSongResolver', () => ({
 }));
 
 const playQueueMock = vi.fn();
+const appendToQueueMock = vi.fn();
 let playbackState: any;
 vi.mock('../playback/PlaybackContext', () => ({ usePlayback: () => playbackState }));
 vi.mock('../hooks/useLyricSync', () => ({ useLyricSync: () => 0 }));
@@ -59,7 +60,8 @@ describe('SharedView', () => {
     playbackState = {
       queue: [], currentIndex: 0, current: null,
       isPlaying: false, repeat: 'off', progress: 0, duration: 0, started: false, lastError: null,
-      playQueue: playQueueMock, start: vi.fn(), togglePlay: vi.fn(), next: vi.fn(), prev: vi.fn(),
+      playQueue: playQueueMock, appendToQueue: appendToQueueMock,
+      start: vi.fn(), togglePlay: vi.fn(), next: vi.fn(), prev: vi.fn(),
       seek: vi.fn(), cycleRepeat: vi.fn(), setRepeat: vi.fn(), getCurrentTime: () => 0,
     };
   });
@@ -70,16 +72,41 @@ describe('SharedView', () => {
     expect(screen.getByText(/링크를 읽을 수 없어요|잘못된/)).toBeInTheDocument();
   });
 
-  it('resolves decoded songs (cache first) and calls playQueue', async () => {
+  it('plays the first song immediately, then appends the rest in order (progressive)', async () => {
     const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }, { id: 's1' }] };
     decodeMock.mockReturnValue(shared);
     getSongMock.mockImplementation((id: string) => (id === 's0' ? song('s0') : undefined));
     resolveMock.mockImplementation(async (id: string) => song(id));
     renderAt('GOOD');
+    // first song plays right away (no waiting for the whole list)
     await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
-    const [songs] = playQueueMock.mock.calls[0];
-    expect(songs.map((s: Song) => s.id)).toEqual(['s0', 's1']);
+    const [firstSongs] = playQueueMock.mock.calls[0];
+    expect(firstSongs.map((s: Song) => s.id)).toEqual(['s0']);
+    // remaining songs are appended (resolved in background)
+    await waitFor(() => expect(appendToQueueMock).toHaveBeenCalled());
+    const appended = appendToQueueMock.mock.calls.flatMap((c) => c[0].map((s: Song) => s.id));
+    expect(appended).toEqual(['s1']);
     expect(resolveMock).toHaveBeenCalledWith('s1'); // s0 came from cache
+  });
+
+  it('skips an unresolvable middle song but appends later ones in order', async () => {
+    const shared: SharedPlaylist = {
+      title: 'Gift', songs: [{ id: 's0' }, { id: 'bad' }, { id: 's2' }],
+    };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockReturnValue(undefined);
+    resolveMock.mockImplementation(async (id: string) => {
+      if (id === 'bad') throw new Error('unplayable');
+      return song(id);
+    });
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    expect(playQueueMock.mock.calls[0][0].map((s: Song) => s.id)).toEqual(['s0']);
+    // 'bad' is skipped; only s2 gets appended, after s0
+    await waitFor(() => {
+      const appended = appendToQueueMock.mock.calls.flatMap((c) => c[0].map((s: Song) => s.id));
+      expect(appended).toEqual(['s2']);
+    });
   });
 
   it('"내 보관함에 저장" creates a playlist with the song ids and navigates', async () => {

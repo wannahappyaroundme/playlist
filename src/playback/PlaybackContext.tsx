@@ -107,6 +107,8 @@ export interface PlaybackApi {
   started: boolean;
   lastError: PlaybackError | null;
   playQueue(songs: Song[], startIndex?: number): void;
+  /** 현재 인덱스/재생을 건드리지 않고 큐 끝에 곡들을 덧붙인다(progressive 수신용). */
+  appendToQueue(songs: Song[]): void;
   start(): void;
   togglePlay(): void;
   next(): void;
@@ -237,6 +239,17 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
     if (target) playerRef.current?.cueVideoById(target.id);
   }, []);
 
+  // 현재 인덱스/재생 상태를 건드리지 않고 큐 끝에 곡을 덧붙인다.
+  // SharedView가 첫 곡 재생을 막지 않으면서 나머지 곡을 백그라운드로 받아 이어붙일 때 쓴다.
+  const appendToQueue = useCallback((songs: Song[]) => {
+    if (songs.length === 0) return;
+    setQueue((prev) => {
+      const next = [...prev, ...songs];
+      queueRef.current = next; // onStateChange 콜백이 즉시 새 큐 길이를 보게 한다
+      return next;
+    });
+  }, []);
+
   // 첫 사용자 제스처: 게이트를 열고 현재 곡을 재생한다.
   const start = useCallback(() => {
     setStarted(true);
@@ -289,6 +302,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       started,
       lastError,
       playQueue,
+      appendToQueue,
       start,
       togglePlay,
       next,
@@ -301,7 +315,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
     }),
     [
       queue, currentIndex, current, isPlaying, repeat, progress, duration, started, lastError,
-      playQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime, getDuration,
+      playQueue, appendToQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime, getDuration,
     ],
   );
 

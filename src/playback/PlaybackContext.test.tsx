@@ -142,6 +142,28 @@ describe('usePlayback state machine (smoke)', () => {
     const { result } = renderHook(() => usePlayback(), { wrapper });
     expect(result.current.getCurrentTime()).toBe(0);
   });
+
+  it('appendToQueue appends in order without disturbing currentIndex/current', () => {
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    act(() => result.current.playQueue([song('a1')], 0));
+    expect(result.current.currentIndex).toBe(0);
+    act(() => result.current.appendToQueue([song('b2'), song('c3')]));
+    expect(result.current.queue.map((s) => s.id)).toEqual(['a1', 'b2', 'c3']);
+    // current playback position is untouched by appends
+    expect(result.current.currentIndex).toBe(0);
+    expect(result.current.current?.id).toBe('a1');
+    // a second append keeps appending at the end, preserving order
+    act(() => result.current.appendToQueue([song('d4')]));
+    expect(result.current.queue.map((s) => s.id)).toEqual(['a1', 'b2', 'c3', 'd4']);
+    expect(result.current.currentIndex).toBe(0);
+  });
+
+  it('appendToQueue with an empty array is a no-op', () => {
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    act(() => result.current.playQueue([song('a1')], 0));
+    act(() => result.current.appendToQueue([]));
+    expect(result.current.queue.map((s) => s.id)).toEqual(['a1']);
+  });
 });
 
 describe('usePlayback durationSec self-heal', () => {

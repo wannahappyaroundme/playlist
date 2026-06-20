@@ -13,6 +13,9 @@ import PlayGate from '../components/PlayGate';
 import SkipToast from '../components/SkipToast';
 import type { Song, SharedPlaylist } from '../types';
 
+// 백그라운드 resolve 동시성 한도(받는 사람 기기/네트워크 부담 + 순서 보장 단순화).
+const RESOLVE_CONCURRENCY = 3;
+
 export default function SharedView() {
   const { encoded } = useParams();
   const navigate = useNavigate();
@@ -24,30 +27,89 @@ export default function SharedView() {
     [encoded],
   );
 
+  // 보관함 저장용으로 지금까지 큐에 들어간 곡들을 추적한다(첫 곡 + 백그라운드로 이어붙인 곡).
   const [songs, setSongs] = useState<Song[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 첫 곡을 확보하기 전까지만 막는다(전체 대기 → 첫 곡 대기로 축소).
+  const [loadingFirst, setLoadingFirst] = useState(true);
+  // 백그라운드 진행 표시: 큐에 들어간 곡 수 / 전체 곡 수.
+  const [readyCount, setReadyCount] = useState(0);
+
+  const resolveOne = useCallback(
+    async (id: string): Promise<Song | null> => {
+      const cached = getSong(id);
+      if (cached) return cached;
+      try {
+        return await resolve(id);
+      } catch {
+        return null; // skip unresolvable song (graceful)
+      }
+    },
+    [resolve],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    if (!shared) { setLoading(false); return; }
+    if (!shared) { setLoadingFirst(false); return; }
+    const entries = shared.songs;
+    const total = entries.length;
+    setLoadingFirst(true);
+    setReadyCount(0);
+    setSongs([]);
+
     (async () => {
-      setLoading(true);
-      const resolved: Song[] = [];
-      for (const entry of shared.songs) {
-        const cached = getSong(entry.id);
-        if (cached) { resolved.push(cached); continue; }
-        try {
-          const s = await resolve(entry.id);
-          resolved.push(s);
-        } catch {
-          // skip unresolvable song (graceful)
-        }
-      }
+      if (total === 0) { if (!cancelled) setLoadingFirst(false); return; }
+
+      // 1) 첫 곡을 먼저 확보해 즉시 재생 게이트를 연다(전체를 기다리지 않음).
+      const first = await resolveOne(entries[0].id);
       if (cancelled) return;
-      setSongs(resolved);
-      setLoading(false);
-      if (resolved.length > 0) playback.playQueue(resolved, 0);
+      if (first) {
+        playback.playQueue([first], 0);
+        setSongs([first]);
+      }
+      setReadyCount(1); // 첫 곡 해석 성공/실패 모두 진행도에는 반영
+      setLoadingFirst(false);
+
+      // 2) 나머지 곡을 동시성 한도로 해석하되, 원래 순서대로 큐에 이어붙인다.
+      const rest = entries.slice(1);
+      if (rest.length === 0) return;
+      const results: (Song | null)[] = new Array(rest.length).fill(null);
+      const resolvedFlags: boolean[] = new Array(rest.length).fill(false);
+      let nextAppendIdx = 0; // 다음에 append할 (rest 기준) 인덱스 — 순서 보장
+      let cursor = 0; // 다음에 resolve를 시작할 (rest 기준) 인덱스
+
+      const flushInOrder = () => {
+        // 앞에서부터 해석이 끝난 곡들만 순서대로 append한다(동시 해석이어도 순서 유지).
+        while (nextAppendIdx < rest.length && resolvedFlags[nextAppendIdx]) {
+          const song = results[nextAppendIdx];
+          if (song) {
+            playback.appendToQueue([song]);
+            setSongs((prev) => [...prev, song]);
+          }
+          setReadyCount((c) => c + 1);
+          nextAppendIdx += 1;
+        }
+      };
+
+      const worker = async () => {
+        while (!cancelled) {
+          const idx = cursor;
+          if (idx >= rest.length) return;
+          cursor += 1;
+          const song = await resolveOne(rest[idx].id);
+          if (cancelled) return;
+          results[idx] = song;
+          resolvedFlags[idx] = true;
+          flushInOrder();
+        }
+      };
+
+      const workers = Array.from(
+        { length: Math.min(RESOLVE_CONCURRENCY, rest.length) },
+        () => worker(),
+      );
+      await Promise.all(workers);
     })();
+
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shared]);
@@ -92,13 +154,22 @@ export default function SharedView() {
   }
 
   const colors = current?.colors ?? { gradientFrom: '#0b1020', gradientTo: '#05070f', accent: '#6b7cff' };
+  const total = shared.songs.length;
+  // 첫 곡은 떴지만 백그라운드로 나머지를 받는 중이면 작은 진행 표시를 띄운다.
+  const showProgress = !loadingFirst && total > 1 && readyCount < total;
 
   return (
     <div className="relative min-h-screen overflow-hidden text-white">
       <GradientBg colors={colors} />
       <SkipToast error={playback.lastError} />
 
-      {loading ? (
+      {showProgress ? (
+        <div className="fixed left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-black/40 px-4 py-1.5 text-xs text-white/80 backdrop-blur">
+          불러오는 중 {readyCount}/{total}
+        </div>
+      ) : null}
+
+      {loadingFirst ? (
         <div className="relative z-10 flex min-h-screen items-center justify-center text-white/70">
           불러오는 중…
         </div>
