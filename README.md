@@ -23,9 +23,9 @@ routes survive a hard refresh on GitHub Pages.
 The app is served from a sub-path, so the Vite `base` **must** match the path
 the site is served from, or every asset 404s.
 
-1. **Set the base.** `base` defaults to `/yejin-playlist/` and is overridable via
+1. **Set the base.** `base` defaults to `/playlist/` and is overridable via
    the `VITE_BASE` env var (see `vite.config.ts`). Keep the default if the repo
-   is named `yejin-playlist`. Otherwise set `VITE_BASE` to your repo path:
+   is named `playlist`. Otherwise set `VITE_BASE` to your repo path:
    - Different repo name → `VITE_BASE=/your-repo-name/`
    - Custom domain or root deployment → `VITE_BASE=/`
 2. **Enable Pages.** Repo Settings → Pages → Build and deployment → **Source =

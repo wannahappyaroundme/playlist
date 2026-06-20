@@ -12,7 +12,7 @@ export interface FetchLyricsParams {
 
 const BASE = 'https://lrclib.net/api';
 const CLIENT_HEADER = {
-  'Lrclib-Client': 'Yejin Playlist (https://github.com/yejin-playlist)',
+  'Lrclib-Client': 'Yejin Playlist (https://github.com/wannahappyaroundme/playlist)',
 };
 
 function toResponse(raw: { syncedLyrics?: unknown; plainLyrics?: unknown }): LrclibResponse {
