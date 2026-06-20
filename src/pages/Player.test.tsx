@@ -54,7 +54,7 @@ describe('Player', () => {
     vi.clearAllMocks();
     playbackState = {
       queue: [], currentIndex: 0, current: null,
-      isPlaying: false, repeat: 'off', progress: 0, duration: 0, started: false,
+      isPlaying: false, repeat: 'off', progress: 0, duration: 0, started: false, lastError: null,
       playQueue: playQueueMock, start: vi.fn(), togglePlay: vi.fn(), next: vi.fn(), prev: vi.fn(),
       seek: vi.fn(), cycleRepeat: vi.fn(), setRepeat: vi.fn(), getCurrentTime: () => 0,
     };

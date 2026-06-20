@@ -10,6 +10,7 @@ import LpDisc from '../components/LpDisc';
 import LyricsView from '../components/LyricsView';
 import Controls from '../components/Controls';
 import PlayGate from '../components/PlayGate';
+import SkipToast from '../components/SkipToast';
 import type { Song, SharedPlaylist } from '../types';
 
 export default function SharedView() {
@@ -81,6 +82,7 @@ export default function SharedView() {
   return (
     <div className="relative min-h-screen overflow-hidden text-white">
       <GradientBg colors={colors} />
+      <SkipToast error={playback.lastError} />
 
       {loading ? (
         <div className="relative z-10 flex min-h-screen items-center justify-center text-white/70">

@@ -8,6 +8,7 @@ import LpDisc from '../components/LpDisc';
 import LyricsView from '../components/LyricsView';
 import Controls from '../components/Controls';
 import PlayGate from '../components/PlayGate';
+import SkipToast from '../components/SkipToast';
 import type { Song } from '../types';
 
 export default function Player() {
@@ -57,6 +58,7 @@ export default function Player() {
   return (
     <div className="relative h-[100dvh] overflow-hidden text-white">
       <GradientBg colors={colors} />
+      <SkipToast error={playback.lastError} />
 
       {!playback.started || !current ? (
         <PlayGate

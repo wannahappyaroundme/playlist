@@ -65,6 +65,12 @@ export function isPlayingFromState(state: number): boolean | null {
   return null; // BUFFERING / UNSTARTED / CUED → no change
 }
 
+/** 마지막으로 '재생 불가'로 건너뛴 곡 정보(토스트 표시용). at은 중복 갱신 식별자. */
+export interface PlaybackError {
+  title: string;
+  at: number;
+}
+
 export interface PlaybackApi {
   queue: Song[];
   currentIndex: number;
@@ -74,6 +80,7 @@ export interface PlaybackApi {
   progress: number;
   duration: number;
   started: boolean;
+  lastError: PlaybackError | null;
   playQueue(songs: Song[], startIndex?: number): void;
   start(): void;
   togglePlay(): void;
@@ -96,6 +103,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [started, setStarted] = useState(false);
+  const [lastError, setLastError] = useState<PlaybackError | null>(null);
 
   const playerRef = useRef<YtPlayer | null>(null);
   // refs mirror state for use inside the (stable) onStateChange callback
@@ -135,6 +143,9 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       },
       onError: () => {
         // 영상 재생 불가(삭제/비공개/임베드 차단 등): 다음 재생 가능 트랙으로 건너뛰거나 정지.
+        // 건너뛴(=현재 깨진) 곡 제목을 토스트용으로 기록한다.
+        const skipped = queueRef.current[indexRef.current];
+        if (skipped) setLastError({ title: skipped.title, at: Date.now() });
         const action = errorAction(indexRef.current, queueRef.current.length, repeatRef.current);
         if (action.kind === 'play') {
           goTo(action.index);
@@ -225,6 +236,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       progress,
       duration,
       started,
+      lastError,
       playQueue,
       start,
       togglePlay,
@@ -236,7 +248,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       getCurrentTime,
     }),
     [
-      queue, currentIndex, current, isPlaying, repeat, progress, duration, started,
+      queue, currentIndex, current, isPlaying, repeat, progress, duration, started, lastError,
       playQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime,
     ],
   );

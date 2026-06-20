@@ -1,15 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 
-// createYtPlayer cannot run in jsdom → never resolves (player stays null), controls are safe no-ops
+// By default createYtPlayer never resolves (player stays null), controls are safe no-ops.
+// A test can opt into a resolving fake player + captured handlers via installFakePlayer().
+let capturedHandlers: { onStateChange?: (s: number) => void; onError?: () => void } = {};
+let fakePlayer: any = null;
+
 vi.mock('../lib/ytPlayer', () => ({
   YT_STATE: { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
-  createYtPlayer: vi.fn(() => new Promise(() => {})),
+  createYtPlayer: vi.fn((_id: string, handlers: any) => {
+    capturedHandlers = handlers;
+    if (fakePlayer) return Promise.resolve(fakePlayer);
+    return new Promise(() => {}); // never resolves
+  }),
 }));
 
 import { PlaybackProvider, usePlayback } from './PlaybackContext';
 import type { Song } from '../types';
+
+function installFakePlayer() {
+  fakePlayer = {
+    loadVideoById: vi.fn(),
+    cueVideoById: vi.fn(),
+    playVideo: vi.fn(),
+    pauseVideo: vi.fn(),
+    seekTo: vi.fn(),
+    getPlayerState: vi.fn(() => 1),
+    getCurrentTime: vi.fn(() => 0),
+    getDuration: vi.fn(() => 0),
+    destroy: vi.fn(),
+  };
+}
 
 const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(PlaybackProvider, null, children);
@@ -29,6 +51,8 @@ function song(id: string): Song {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  capturedHandlers = {};
+  fakePlayer = null;
 });
 
 describe('usePlayback state machine (smoke)', () => {
@@ -40,6 +64,22 @@ describe('usePlayback state machine (smoke)', () => {
     expect(result.current.repeat).toBe('off');
     expect(result.current.isPlaying).toBe(false);
     expect(result.current.started).toBe(false);
+    expect(result.current.lastError).toBeNull();
+  });
+
+  it('records lastError (skipped song title) when a player error skips a track', async () => {
+    installFakePlayer();
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    // wait for the fake player to be installed + onError captured
+    await waitFor(() => expect(capturedHandlers.onError).toBeTypeOf('function'));
+    act(() => result.current.playQueue([song('a1'), song('b2')], 0));
+    expect(result.current.lastError).toBeNull();
+    // simulate YouTube onError on the current (broken) track at index 0
+    act(() => capturedHandlers.onError!());
+    expect(result.current.lastError?.title).toBe('a1');
+    expect(typeof result.current.lastError?.at).toBe('number');
+    // and it skipped forward to the next playable track
+    expect(result.current.currentIndex).toBe(1);
   });
 
   it('cycleRepeat cycles off -> all -> one -> off', () => {
