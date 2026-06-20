@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseLrc } from '../lib/lrc';
-import { parseTitleHeuristic, resolveBestThumbnail } from '../lib/youtube';
+import { parseTitleHeuristic, resolveBestThumbnail, fetchYoutubeMeta } from '../lib/youtube';
 import { buildSongColors, FALLBACK_COLORS, extractPalette, type RawPalette } from '../lib/colors';
 import { fetchLyrics } from '../lib/lrclib';
 import { saveSong } from '../lib/storage';
@@ -82,24 +82,6 @@ function resolveError(code: ResolveErrorCode, message: string): ResolveError {
   return Object.assign(new Error(message), { code });
 }
 
-/**
- * 프로브 폴링 종료 조건(순수). title까지 채워지고 **video_id가 요청한 곡과 일치**해야 finish한다.
- * (프로브 플레이어를 재사용하면 새 영상 로드 전 직전 영상 데이터가 잠깐 반환되므로,
- *  video_id 일치를 확인하지 않으면 직전 곡 제목을 새 곡에 잘못 저장하게 된다.)
- * CUED 상태 단독으로는 끝내지 않으며, 타임아웃(elapsed > timeoutMs)이면 메타가 비어도 종료해 행을 막는다.
- */
-export function metaPollDone(
-  data: { video_id?: string; title?: string } | null | undefined,
-  dur: number,
-  elapsed: number,
-  timeoutMs: number,
-  expectedId?: string,
-): boolean {
-  if (elapsed > timeoutMs) return true;
-  if (!(data && data.video_id && data.title && dur > 0)) return false;
-  return !expectedId || data.video_id === expectedId;
-}
-
 export interface ResolveDeps {
   getMeta(videoId: string): Promise<ProbeMeta>;
   /** THUMB_FALLBACK 체인으로 실제 로드되는 커버 URL을 고른다. 미주입 시 resolveBestThumbnail 사용. */
@@ -165,7 +147,8 @@ export interface SongResolver {
 }
 
 const PROBE_ELEMENT_ID = 'yejin-probe';
-const META_TIMEOUT_MS = 8000;
+// 길이(duration)만 best-effort로 읽는 프로브 타임아웃. 제목은 oEmbed에서 즉시 오므로 짧게.
+const DURATION_TIMEOUT_MS = 6000;
 
 /**
  * 메인 재생과 분리된 프로브 YtPlayer 1개로 메타를 읽어 곡을 resolve한다.
@@ -217,50 +200,51 @@ export function useSongResolver(): SongResolver {
     return player;
   }, []);
 
-  const getMeta = useCallback(
-    async (videoId: string) => {
-      const probe = await ensureProbe();
-      probeErroredRef.current = false;
-      await new Promise<void>((resolve) => {
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          resolve();
-        };
-        // poll until metadata is populated after cue (CUED alone is NOT done)
+  // 프로브에서 '길이'만 best-effort로 읽는다(가사 매칭/광고 게이트용). video_id 일치 확인 후 반환.
+  // 실패/스테일/타임아웃이면 0(길이 없음 — 가사는 길이 없이도 조회, 광고 게이트는 자가치유로 보강).
+  const probeDuration = useCallback(
+    async (videoId: string): Promise<number> => {
+      try {
+        const probe = await ensureProbe();
         probe.cueVideoById(videoId);
         const start = Date.now();
-        const poll = () => {
-          if (probeErroredRef.current) { finish(); return; }
-          const data = probe.getVideoData();
-          const dur = probe.getDuration();
-          if (metaPollDone(data, dur, Date.now() - start, META_TIMEOUT_MS, videoId)) {
-            finish();
-          } else {
-            setTimeout(poll, 100);
-          }
-        };
-        poll();
-      });
-      const data = probe.getVideoData();
-      const dur = probe.getDuration() || 0;
-      // video_id가 요청한 곡과 일치할 때만 신뢰(스테일/직전 곡 데이터 거부).
-      const idMatches = data.video_id === videoId;
-      const title = idMatches ? data.title || '' : '';
-      // metaReady: 에러 없이 '요청한 곡'의 title + duration까지 받았는지(타임아웃/에러/스테일 식별용)
-      const probeErrored = probeErroredRef.current;
-      const metaReady = !probeErrored && idMatches && !!(data.video_id && title && dur > 0);
-      return {
-        video_id: videoId,
-        title,
-        author: data.author || '',
-        durationSec: dur,
-        metaReady,
-        probeErrored,
-      };
+        await new Promise<void>((resolve) => {
+          const poll = () => {
+            const d = probe.getVideoData();
+            const dur = probe.getDuration();
+            if ((d?.video_id === videoId && dur > 0) || Date.now() - start > DURATION_TIMEOUT_MS) {
+              resolve();
+            } else {
+              setTimeout(poll, 100);
+            }
+          };
+          poll();
+        });
+        return probe.getVideoData()?.video_id === videoId ? probe.getDuration() || 0 : 0;
+      } catch {
+        return 0;
+      }
     },
     [ensureProbe],
+  );
+
+  const getMeta = useCallback(
+    async (videoId: string) => {
+      // 제목/아티스트: 링크 기반 oEmbed에서 직접(플레이어 getVideoData의 '직전 곡 오염' 원천 차단).
+      const meta = await fetchYoutubeMeta(videoId);
+      // 길이: 프로브에서 best-effort(없어도 진행).
+      const durationSec = await probeDuration(videoId);
+      return {
+        video_id: videoId,
+        title: meta.title,
+        author: meta.author,
+        durationSec,
+        // 제목을 받았으면 진행. oEmbed 401/403/404(임베드불가/비공개/삭제)면 unavailable→unplayable.
+        metaReady: !meta.unavailable && !!meta.title,
+        probeErrored: meta.unavailable,
+      };
+    },
+    [probeDuration],
   );
 
   // resolve와 reResolve가 공유하는 전체 파이프라인 실행. resolveSongWith는 캐시를 보지 않고

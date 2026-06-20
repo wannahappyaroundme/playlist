@@ -1,52 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { metaPollDone, resolveSongWith, type ResolveDeps } from './useSongResolver';
+import { resolveSongWith, type ResolveDeps } from './useSongResolver';
 import type { RawPalette } from '../lib/colors';
-
-describe('metaPollDone (probe poll exit condition)', () => {
-  const data = (over: Partial<{ video_id: string; title: string }> = {}) => ({
-    video_id: 'abc12345678',
-    title: 'Some Title',
-    author: 'Chan',
-    ...over,
-  });
-
-  it('finishes only when video_id + title + dur>0 are all present', () => {
-    expect(metaPollDone(data(), 200, 100, 8000)).toBe(true);
-  });
-
-  it('does NOT finish when title is still empty (even with video_id + dur)', () => {
-    expect(metaPollDone(data({ title: '' }), 200, 100, 8000)).toBe(false);
-  });
-
-  it('does NOT finish on CUED-like state when dur is 0', () => {
-    expect(metaPollDone(data(), 0, 100, 8000)).toBe(false);
-  });
-
-  it('does NOT finish when video_id missing', () => {
-    expect(metaPollDone(data({ video_id: '' }), 200, 100, 8000)).toBe(false);
-  });
-
-  it('finishes on timeout regardless of metadata (so it never hangs)', () => {
-    expect(metaPollDone(data({ title: '' }), 0, 8001, 8000)).toBe(true);
-  });
-
-  it('handles null data without throwing', () => {
-    expect(metaPollDone(null, 200, 100, 8000)).toBe(false);
-  });
-
-  // 스테일 데이터 거부: 프로브가 직전 곡 데이터를 반환하는 동안은 finish하지 않는다.
-  it('does NOT finish when video_id mismatches the requested id (stale probe data)', () => {
-    expect(metaPollDone(data({ video_id: 'OLDvideoID0' }), 200, 100, 8000, 'abc12345678')).toBe(false);
-  });
-
-  it('finishes when video_id matches the requested id', () => {
-    expect(metaPollDone(data(), 200, 100, 8000, 'abc12345678')).toBe(true);
-  });
-
-  it('still times out even if the id never matches (never hangs)', () => {
-    expect(metaPollDone(data({ video_id: 'OLDvideoID0' }), 200, 8001, 8000, 'abc12345678')).toBe(true);
-  });
-});
 
 function makeDeps(over: Partial<ResolveDeps> = {}): ResolveDeps {
   return {

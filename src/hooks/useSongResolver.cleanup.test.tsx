@@ -25,7 +25,12 @@ vi.mock('../lib/ytPlayer', () => ({
 // keep cover/palette/lyrics cheap & synchronous
 vi.mock('../lib/youtube', async (orig) => {
   const actual = await (orig() as Promise<Record<string, unknown>>);
-  return { ...actual, resolveBestThumbnail: vi.fn(async () => 'https://i.ytimg.com/vi/abc12345678/sddefault.jpg') };
+  return {
+    ...actual,
+    resolveBestThumbnail: vi.fn(async () => 'https://i.ytimg.com/vi/abc12345678/sddefault.jpg'),
+    // 제목/아티스트는 이제 oEmbed(fetchYoutubeMeta)에서 온다 — 네트워크 없이 고정값 반환.
+    fetchYoutubeMeta: vi.fn(async () => ({ title: 'A - B', author: 'Chan', unavailable: false })),
+  };
 });
 vi.mock('../lib/colors', async (orig) => {
   const actual = await (orig() as Promise<Record<string, unknown>>);

@@ -8,6 +8,10 @@ import {
   fallbackCoverSrc,
   isVideoId,
   ID_RE,
+  cleanAuthor,
+  parseOembedMeta,
+  fetchYoutubeMeta,
+  oembedUrl,
 } from './youtube';
 
 describe('parseVideoId', () => {
@@ -310,5 +314,56 @@ describe('fallbackCoverSrc', () => {
     fallbackCoverSrc(img);
     expect(img.src).toBe('https://example.com/cover.png');
     expect(img.dataset.coverFallback).toBe('done');
+  });
+});
+
+describe('cleanAuthor', () => {
+  it('strips "- Topic" auto-channel suffix', () => {
+    expect(cleanAuthor('Skinny Brown - Topic')).toBe('Skinny Brown');
+    expect(cleanAuthor('아이유 - 토픽')).toBe('아이유');
+  });
+  it('strips VEVO suffix and trims', () => {
+    expect(cleanAuthor('AdeleVEVO')).toBe('Adele');
+    expect(cleanAuthor('  IU Official  ')).toBe('IU Official');
+  });
+});
+
+describe('parseOembedMeta', () => {
+  it('reads title/author_name', () => {
+    expect(parseOembedMeta({ title: 'if i die', author_name: 'Skinny Brown - Topic' })).toEqual({
+      title: 'if i die',
+      author: 'Skinny Brown - Topic',
+    });
+  });
+  it('returns empty strings for missing/invalid', () => {
+    expect(parseOembedMeta(null)).toEqual({ title: '', author: '' });
+    expect(parseOembedMeta({})).toEqual({ title: '', author: '' });
+  });
+});
+
+describe('fetchYoutubeMeta (oEmbed, link-based)', () => {
+  const ok = (body: unknown) =>
+    ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
+  const err = (status: number) =>
+    ({ ok: false, status, json: async () => null }) as unknown as Response;
+
+  it('returns title/author from oEmbed', async () => {
+    const f = vi.fn(async () => ok({ title: 'if i die (Feat. ASH ISLAND)', author_name: 'Skinny Brown - Topic' }));
+    const meta = await fetchYoutubeMeta('Qvh9vLfWTR8', f as unknown as typeof fetch);
+    expect(meta).toEqual({ title: 'if i die (Feat. ASH ISLAND)', author: 'Skinny Brown - Topic', unavailable: false });
+    expect(f).toHaveBeenCalledWith(oembedUrl('Qvh9vLfWTR8'), expect.anything());
+  });
+
+  it('marks unavailable on 401/403/404 (embed disabled / private / deleted)', async () => {
+    for (const s of [401, 403, 404]) {
+      const meta = await fetchYoutubeMeta('x', (async () => err(s)) as unknown as typeof fetch);
+      expect(meta.unavailable).toBe(true);
+      expect(meta.title).toBe('');
+    }
+  });
+
+  it('returns empty (not unavailable) on network error so the user can retry', async () => {
+    const meta = await fetchYoutubeMeta('x', (async () => { throw new Error('net'); }) as unknown as typeof fetch);
+    expect(meta).toEqual({ title: '', author: '', unavailable: false });
   });
 });

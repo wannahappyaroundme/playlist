@@ -199,9 +199,18 @@ function stripDanglingSeparator(s: string): string {
     .trim();
 }
 
+// 'Artist - Topic' 자동생성 채널, 'VEVO' 접미사를 제거해 순수 아티스트명만 남긴다.
+export function cleanAuthor(author: string): string {
+  return (author ?? '')
+    .replace(/\s*[-–—]\s*Topic\s*$/i, '')
+    .replace(/\s*[-–—]\s*토픽\s*$/i, '')
+    .replace(/VEVO\s*$/i, '')
+    .trim();
+}
+
 export function parseTitleHeuristic(rawTitle: string, author: string): ParsedTitle {
   const cleaned = stripNoise(rawTitle ?? '');
-  const authorClean = (author ?? '').trim() || 'Unknown';
+  const authorClean = cleanAuthor(author) || 'Unknown';
   const fallbackTitle =
     stripDanglingSeparator(cleaned) || (rawTitle ?? '').trim() || 'Untitled';
   const fallback: ParsedTitle = {
@@ -219,4 +228,47 @@ export function parseTitleHeuristic(rawTitle: string, author: string): ParsedTit
   if (!left || !right) return fallback;
 
   return { artist: left, title: right };
+}
+
+export interface YoutubeMeta {
+  title: string;
+  author: string;
+  /** oEmbed 401/403/404 등으로 정보를 못 가져옴(임베드 불가/비공개/삭제 추정). */
+  unavailable: boolean;
+}
+
+export function oembedUrl(videoId: string): string {
+  const watch = `https://www.youtube.com/watch?v=${videoId}`;
+  return `https://www.youtube.com/oembed?url=${encodeURIComponent(watch)}&format=json`;
+}
+
+export function parseOembedMeta(
+  json: { title?: unknown; author_name?: unknown } | null,
+): { title: string; author: string } {
+  const title = json && typeof json.title === 'string' ? json.title : '';
+  const author = json && typeof json.author_name === 'string' ? json.author_name : '';
+  return { title, author };
+}
+
+/**
+ * 링크(영상 ID)로 YouTube oEmbed에서 제목/아티스트를 직접 가져온다.
+ * 플레이어 getVideoData(반정식·타이밍 불안정 → '직전 곡 제목 오염') 대신 사용한다.
+ * youtube.com/oembed는 브라우저 CORS 허용(실측). 401/403/404 → 임베드불가/비공개/삭제로 unavailable.
+ */
+export async function fetchYoutubeMeta(
+  videoId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<YoutubeMeta> {
+  try {
+    const res = await fetchImpl(oembedUrl(videoId), { headers: { Accept: 'application/json' } });
+    if (!res.ok) {
+      const unavailable = res.status === 401 || res.status === 403 || res.status === 404;
+      return { title: '', author: '', unavailable };
+    }
+    const json = await res.json().catch(() => null);
+    const { title, author } = parseOembedMeta(json);
+    return { title, author, unavailable: !title };
+  } catch {
+    return { title: '', author: '', unavailable: false };
+  }
 }
