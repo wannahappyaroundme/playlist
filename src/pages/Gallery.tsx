@@ -187,6 +187,12 @@ export default function Gallery() {
           })}
         </ul>
       )}
+
+      <footer className="mt-16 flex items-center justify-center gap-3 text-xs text-white/40">
+        <Link to="/terms" className="hover:text-white/70">이용약관</Link>
+        <span aria-hidden="true">·</span>
+        <Link to="/privacy" className="hover:text-white/70">개인정보처리방침</Link>
+      </footer>
     </div>
   );
 }
