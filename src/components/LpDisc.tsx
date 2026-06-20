@@ -55,16 +55,33 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
     []
   );
 
+  // Spec §7: cover (square) and vinyl (circle) share the SAME diameter D, placed
+  // side by side, with the vinyl slid LEFT over the cover by --lp-overlap (42%).
+  // Container width = D + D - overlap*D = D*(2 - 0.42). Each piece is D wide, so
+  // its width fraction of the container = 1 / (2 - overlap). With overlap 0.42 →
+  // ~63.3%, leaving the cover's left ~58% (of its own width) visible as the sleeve.
   return (
-    <div className="relative w-full max-w-[min(70vmin,520px)] aspect-square mx-auto select-none">
+    <div
+      className="relative w-full max-w-[min(92vmin,720px)] mx-auto select-none"
+      style={{
+        // 2 - overlap as an aspect-ratio width:height (height == D == one piece)
+        aspectRatio: `calc(2 - var(--lp-overlap, 42%) / 100%) / 1`,
+        // expose the per-piece diameter as a fraction of the container width
+        ['--lp-piece' as string]: 'calc(1 / (2 - var(--lp-overlap, 42%) / 100%) * 100%)',
+      }}
+    >
       {/* glow halo behind, tinted by accent */}
       <div
         data-testid="lp-glow"
         className="absolute inset-0 rounded-3xl blur-2xl opacity-40 pointer-events-none"
         style={{ background: `radial-gradient(circle at 50% 50%, ${accent} 0%, transparent 70%)` }}
       />
-      {/* square album cover (sleeve) on the left/under */}
-      <div className="absolute left-0 top-0 h-full w-[58%] rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+      {/* square album cover (sleeve) on the left — same diameter as the vinyl */}
+      <div
+        data-testid="lp-cover"
+        className="absolute left-0 top-0 h-full aspect-square rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10"
+        style={{ width: 'var(--lp-piece)' }}
+      >
         <img
           src={cover}
           alt="album cover"
@@ -72,13 +89,14 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
           onError={(e) => fallbackCoverSrc(e.currentTarget)}
         />
       </div>
-      {/* LP vinyl overlapping ~42% to the right */}
+      {/* LP vinyl: same diameter, anchored right, overlapping the cover by 42% */}
       <div
         data-testid="lp-vinyl"
         data-spinning={String(spinning)}
         ref={vinylRef}
         className="absolute top-0 right-0 h-full aspect-square rounded-full shadow-2xl ring-1 ring-black/40"
         style={{
+          width: 'var(--lp-piece)',
           background: [
             'repeating-radial-gradient(circle at 50% 50%, #0a0a0a 0px, #0a0a0a 1px, #171717 2px, #0a0a0a 3px)',
             'conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.06), rgba(255,255,255,0) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0) 75%, rgba(255,255,255,0.06) 100%)',
