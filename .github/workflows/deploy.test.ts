@@ -37,6 +37,15 @@ describe('GitHub Pages deploy workflow', () => {
     expect(yml).toContain('npm run build');
   });
 
+  it('runs the tests before building (broken tests block deploy)', () => {
+    expect(yml).toMatch(/npm (run )?test/);
+    const testAt = yml.search(/npm (run )?test/);
+    const buildAt = yml.indexOf('npm run build');
+    expect(testAt).toBeGreaterThanOrEqual(0);
+    expect(buildAt).toBeGreaterThanOrEqual(0);
+    expect(testAt).toBeLessThan(buildAt);
+  });
+
   it('uploads the dist directory and targets the github-pages environment', () => {
     expect(yml).toContain('path: ./dist');
     expect(yml).toContain('environment:');
