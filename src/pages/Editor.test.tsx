@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import type { Song, Playlist } from '../types';
@@ -15,6 +15,12 @@ vi.mock('../lib/storage', () => ({
 const buildSharePayloadMock = vi.fn((..._a: any[]) => ({ encoded: 'ENC', titlesDropped: false }));
 vi.mock('../lib/share', () => ({
   buildSharePayload: (...a: any[]) => buildSharePayloadMock(...a),
+}));
+
+// reResolve only works in a real browser (YT iframe). Mock the resolver hook.
+const reResolveMock = vi.fn();
+vi.mock('../hooks/useSongResolver', () => ({
+  useSongResolver: () => ({ resolve: vi.fn(), reResolve: reResolveMock, resolving: false }),
 }));
 
 let lastOnAdd: ((s: Song) => void) | null = null;
@@ -105,6 +111,14 @@ describe('Editor', () => {
     const calls = savePlaylistMock.mock.calls;
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.songIds).toEqual(['s0', 's2']);
+  });
+
+  it('clicking "가사/메타 다시 찾기" calls reResolve(song.id)', async () => {
+    reResolveMock.mockResolvedValue(song('s0'));
+    renderEditor();
+    const btn = screen.getByRole('button', { name: '가사/메타 다시 찾기' });
+    await userEvent.click(btn);
+    await waitFor(() => expect(reResolveMock).toHaveBeenCalledWith('s0'));
   });
 
   it('"이 곡만 보내기" reveals a single-song share built from exactly one song', async () => {

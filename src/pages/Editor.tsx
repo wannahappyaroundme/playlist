@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPlaylist, savePlaylist, getSong } from '../lib/storage';
 import { buildSharePayload } from '../lib/share';
+import { useSongResolver } from '../hooks/useSongResolver';
 import PasteInput from '../components/PasteInput';
 import SongCard from '../components/SongCard';
 import QrShare from '../components/QrShare';
@@ -18,10 +19,17 @@ export default function Editor() {
   );
   // "이 곡만 보내기"로 펼쳐진 단일 곡 공유 대상 (videoId). null이면 닫힘.
   const [shareSongId, setShareSongId] = useState<string | null>(null);
+  const { reResolve } = useSongResolver();
+  // reResolve가 풀(saveSong)을 덮어쓴 뒤 songs 메모를 다시 계산시키는 트리거.
+  const [poolVersion, setPoolVersion] = useState(0);
+  // 현재 '다시 찾기' 진행 중인 곡 id(버튼 비활성/aria-busy용).
+  const [reResolvingId, setReResolvingId] = useState<string | null>(null);
 
   const songs = useMemo<Song[]>(
     () => (playlist ? playlist.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s) : []),
-    [playlist],
+    // poolVersion이 바뀌면 풀에서 곡을 다시 읽어 갱신된 제목/가사/색을 반영한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [playlist, poolVersion],
   );
 
   const persist = (next: Playlist) => {
@@ -56,6 +64,20 @@ export default function Editor() {
   const removeAt = (index: number) => {
     const ids = playlist.songIds.filter((_, i) => i !== index);
     persist({ ...playlist, songIds: ids });
+  };
+
+  // 가사/메타가 안 잡힌 곡을 캐시 무시하고 강제로 다시 찾아 풀을 덮어쓴 뒤 목록을 갱신한다.
+  const handleReResolve = async (songId: string) => {
+    if (reResolvingId) return; // 동시 다중 실행 방지
+    setReResolvingId(songId);
+    try {
+      await reResolve(songId);
+      setPoolVersion((v) => v + 1); // 갱신된 제목/가사/색을 다시 읽게 한다
+    } catch {
+      window.alert('다시 찾기에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setReResolvingId(null);
+    }
   };
 
   const shareBase = `${window.location.origin}${window.location.pathname}#/s/`;
@@ -166,6 +188,16 @@ export default function Editor() {
                   onShare={() => setShareSongId((id) => (id === s.id ? null : s.id))}
                 />
               </div>
+              <button
+                type="button"
+                aria-label="가사/메타 다시 찾기"
+                aria-busy={reResolvingId === s.id}
+                disabled={reResolvingId !== null}
+                onClick={() => handleReResolve(s.id)}
+                className="rounded-lg bg-white/10 px-2 py-1 text-xs disabled:opacity-50"
+              >
+                {reResolvingId === s.id ? '찾는 중…' : '다시 찾기'}
+              </button>
               <button type="button" aria-label="위로" onClick={() => move(i, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
               <button type="button" aria-label="아래로" onClick={() => move(i, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
               <button type="button" aria-label="삭제" onClick={() => removeAt(i)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
