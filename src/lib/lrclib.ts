@@ -22,6 +22,49 @@ function toResponse(raw: { syncedLyrics?: unknown; plainLyrics?: unknown }): Lrc
   };
 }
 
+function hasLyrics(r: LrclibResponse): boolean {
+  return !!(r.syncedLyrics || r.plainLyrics);
+}
+
+interface SearchCandidate {
+  syncedLyrics?: unknown;
+  plainLyrics?: unknown;
+  duration?: unknown;
+}
+
+// Score a /api/search candidate. Higher is better.
+// - strong bonus for having syncedLyrics (dominates duration penalty)
+// - if durationSec is known, bonus for a close duration match, penalty for a large gap
+export function scoreSearchCandidate(c: SearchCandidate, durationSec?: number): number {
+  let score = 0;
+  if (typeof c.syncedLyrics === 'string' && c.syncedLyrics) score += 100;
+  else if (typeof c.plainLyrics === 'string' && c.plainLyrics) score += 10;
+
+  if (typeof durationSec === 'number' && typeof c.duration === 'number') {
+    const diff = Math.abs(c.duration - durationSec);
+    if (diff <= 2) score += 30;
+    else score -= diff; // farther = larger penalty (stays below the synced bonus for sane gaps)
+  }
+  return score;
+}
+
+// Pick the best candidate from a /api/search list. Tie-break by array order (earlier wins).
+export function pickBestCandidate(
+  list: SearchCandidate[],
+  durationSec?: number,
+): SearchCandidate | undefined {
+  let best: SearchCandidate | undefined;
+  let bestScore = -Infinity;
+  for (const c of list) {
+    const s = scoreSearchCandidate(c, durationSec);
+    if (s > bestScore) {
+      bestScore = s;
+      best = c;
+    }
+  }
+  return best;
+}
+
 export async function fetchLyrics(
   p: FetchLyricsParams,
   fetchImpl: typeof fetch = fetch,
@@ -38,9 +81,12 @@ export async function fetchLyrics(
     const getRes = await fetchImpl(getUrl.toString(), { headers: { ...CLIENT_HEADER } });
     if (getRes.ok) {
       const body = await getRes.json();
-      return toResponse(body ?? {});
+      const r = toResponse(body ?? {});
+      // Fix 9: a 200 record can have both lyrics null/empty; only return if it
+      // actually carries lyrics, otherwise fall through to the search fallback.
+      if (hasLyrics(r)) return r;
     }
-    // any non-ok (404 etc.) -> fall through to search
+    // any non-ok (404 etc.) or empty-lyrics 200 -> fall through to search
   } catch {
     // network error on /api/get -> still try search
   }
@@ -54,7 +100,10 @@ export async function fetchLyrics(
     if (!searchRes.ok) return null;
     const list = await searchRes.json();
     if (Array.isArray(list) && list.length > 0) {
-      return toResponse(list[0] ?? {});
+      // Fix 10: score candidates (synced + duration proximity) instead of list[0].
+      const best = pickBestCandidate(list as SearchCandidate[], p.durationSec);
+      const r = toResponse(best ?? {});
+      return hasLyrics(r) ? r : null;
     }
     return null;
   } catch {
