@@ -9,6 +9,14 @@ function jsonResponse(body: unknown, status = 200): Response {
   } as unknown as Response;
 }
 
+// no-op sleep so retry/backoff tests don't actually wait
+const noSleep = async () => {};
+
+// an error shaped like a fetch AbortError (what AbortController triggers on timeout)
+function abortError(): Error {
+  return Object.assign(new Error('aborted'), { name: 'AbortError' });
+}
+
 describe('fetchLyrics /api/get success', () => {
   it('hits /api/get with query params and Lrclib-Client header, returns lyrics', async () => {
     const fetchImpl = vi.fn(async () =>
@@ -88,7 +96,8 @@ describe('fetchLyrics /api/get 404 -> /api/search fallback', () => {
       throw new Error('network down');
     }) as unknown as typeof fetch;
 
-    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl);
+    // inject no-op sleep so retry/backoff doesn't actually wait
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: async () => {} });
     expect(res).toBeNull();
   });
 });
@@ -194,5 +203,133 @@ describe('fetchLyrics /api/search scoring (Fix 10)', () => {
 
     const res = await fetchLyrics({ artist: 'A', track: 'B', durationSec: 200 }, fetchImpl);
     expect(res?.syncedLyrics).toBe('[00:01.00] first');
+  });
+});
+
+describe('fetchLyrics resilience: retry/backoff/timeout (transient only)', () => {
+  it('retries /api/get on HTTP 5xx then succeeds (no search fallback)', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 503)) // get attempt 1 -> retry
+      .mockResolvedValueOnce(jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' })) // get attempt 2
+      .mockRejectedValue(new Error('search should not be called')) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] ok');
+    expect(fetchImpl).toHaveBeenCalledTimes(2); // 5xx + success, no search
+  });
+
+  it('retries /api/get on HTTP 429 (rate limit) then succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'rate' }, 429)) // retry
+      .mockResolvedValueOnce(jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' }))
+      .mockRejectedValue(new Error('search should not be called')) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] ok');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries on a thrown network error then succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('ECONNRESET')) // network error -> retry
+      .mockResolvedValueOnce(jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' }))
+      .mockRejectedValue(new Error('search should not be called')) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] ok');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries on a timeout (AbortError) then succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(abortError()) // timeout -> retry
+      .mockResolvedValueOnce(jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' }))
+      .mockRejectedValue(new Error('search should not be called')) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] ok');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT retry /api/get on 404 (definitive) and falls straight to search', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 404 }, 404)) // get: no retry
+      .mockResolvedValueOnce(
+        jsonResponse([{ syncedLyrics: '[00:01.00] s', plainLyrics: 's' }]),
+      ) as unknown as typeof fetch; // search
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] s');
+    // exactly one get (no retry on 404) + one search
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const calls = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(String(calls[0][0])).toContain('/api/get');
+    expect(String(calls[1][0])).toContain('/api/search');
+  });
+
+  it('does NOT retry on 400/401/403 (definitive client errors)', async () => {
+    for (const status of [400, 401, 403]) {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ error: 'no' }, status)) // get -> fall to search, no retry
+        .mockResolvedValueOnce(
+          jsonResponse({ error: 'no' }, status),
+        ) as unknown as typeof fetch; // search -> no retry, null
+
+      const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+      expect(res).toBeNull();
+      // one get + one search, neither retried
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    }
+  });
+
+  it('gives up after 3 attempts of persistent 5xx on both endpoints -> null', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ error: 'down' }, 500)) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res).toBeNull();
+    // 3 attempts on /api/get + 3 attempts on /api/search
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
+  it('gives up after 3 attempts of persistent timeouts -> null', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw abortError();
+    }) as unknown as typeof fetch;
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    expect(res).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(6); // 3 get + 3 search
+  });
+
+  it('uses exponential backoff delays 1s -> 2s between retries (injectable sleep observed)', async () => {
+    const delays: number[] = [];
+    const sleep = vi.fn(async (ms: number) => { delays.push(ms); });
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 500)) // get attempt 1
+      .mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 500)) // get attempt 2
+      .mockResolvedValueOnce(
+        jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' }),
+      ) as unknown as typeof fetch; // get 3 ok
+
+    const res = await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep });
+    expect(res?.syncedLyrics).toBe('[00:01.00] ok');
+    expect(delays).toEqual([1000, 2000]);
+  });
+
+  it('passes an AbortSignal to fetch for timeout enforcement', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ syncedLyrics: '[00:01.00] ok', plainLyrics: 'ok' }),
+    ) as unknown as typeof fetch;
+
+    await fetchLyrics({ artist: 'A', track: 'B' }, fetchImpl, { sleep: noSleep });
+    const init = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 });
