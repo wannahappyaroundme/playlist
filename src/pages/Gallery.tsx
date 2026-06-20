@@ -1,5 +1,30 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
+import { thumbnailUrl } from '../lib/youtube';
+
+const EMPTY_BOX = 'aspect-square rounded-xl bg-white/5';
+
+function CoverThumb({ id, playlistId }: { id?: string; playlistId: string }) {
+  if (!id) {
+    return <div data-testid={`gallery-cover-empty-${playlistId}`} className={EMPTY_BOX} />;
+  }
+  return (
+    <img
+      data-testid={`gallery-cover-${playlistId}`}
+      src={thumbnailUrl(id, 'mqdefault')}
+      alt=""
+      loading="lazy"
+      className={`${EMPTY_BOX} object-cover`}
+      // one-shot fallback to a neutral box if the thumbnail fails to load
+      onError={(e) => {
+        const el = e.currentTarget;
+        if (el.dataset.fallback === 'done') return;
+        el.dataset.fallback = 'done';
+        el.removeAttribute('src');
+      }}
+    />
+  );
+}
 
 export default function Gallery() {
   const { playlists, create } = usePlaylists();
@@ -37,7 +62,7 @@ export default function Gallery() {
                 to={`/p/${p.id}`}
                 className="block rounded-2xl bg-white/10 p-4 backdrop-blur transition hover:bg-white/15"
               >
-                <div className="aspect-square rounded-xl bg-white/5" />
+                <CoverThumb id={p.coverVideoId ?? p.songIds[0]} playlistId={p.id} />
                 <p className="mt-3 truncate text-sm font-medium">{p.title}</p>
                 <p className="mt-1 text-xs text-white/50">{p.songIds.length}곡</p>
               </Link>

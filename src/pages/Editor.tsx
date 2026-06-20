@@ -19,8 +19,11 @@ export default function Editor() {
   );
 
   const persist = (next: Playlist) => {
-    setPlaylist(next);
-    savePlaylist(next);
+    // Keep the dead-no-more coverVideoId field in sync with the first song so
+    // gallery cards can show a representative cover thumbnail (Fix 16).
+    const synced: Playlist = { ...next, coverVideoId: next.songIds[0] };
+    setPlaylist(synced);
+    savePlaylist(synced);
   };
 
   if (!playlist) {

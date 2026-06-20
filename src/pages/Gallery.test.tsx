@@ -20,8 +20,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 import Gallery from './Gallery';
 
-const mk = (id: string, title: string): Playlist => ({
-  id, title, songIds: [], createdAt: '2026-06-20T00:00:00.000Z',
+const mk = (id: string, title: string, over: Partial<Playlist> = {}): Playlist => ({
+  id, title, songIds: [], createdAt: '2026-06-20T00:00:00.000Z', ...over,
 });
 
 function renderGallery() {
@@ -44,6 +44,21 @@ describe('Gallery', () => {
     const links = screen.getAllByRole('link').map(a => a.getAttribute('href'));
     expect(links.some(h => h?.includes('/p/aa'))).toBe(true);
     expect(links.some(h => h?.includes('/p/bb'))).toBe(true);
+  });
+
+  it('renders a cover thumbnail img when coverVideoId is set (Fix 16)', () => {
+    playlistsMock = [mk('aa', 'Late Night', { coverVideoId: 'vid12345678', songIds: ['vid12345678'] })];
+    renderGallery();
+    const img = screen.getByTestId('gallery-cover-aa') as HTMLImageElement;
+    expect(img.tagName).toBe('IMG');
+    expect(img.getAttribute('src')).toContain('vid12345678');
+  });
+
+  it('shows a placeholder (no img) when coverVideoId is absent (Fix 16)', () => {
+    playlistsMock = [mk('bb', 'Empty One')];
+    renderGallery();
+    expect(screen.queryByTestId('gallery-cover-bb')).toBeNull();
+    expect(screen.getByTestId('gallery-cover-empty-bb')).toBeInTheDocument();
   });
 
   it('shows an empty-state hint when there are no playlists', () => {
