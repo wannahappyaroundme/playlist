@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Song } from '../types';
 import { useSongResolver } from '../hooks/useSongResolver';
 import { parseVideoId } from '../lib/youtube';
+import LoadingOverlay from './LoadingOverlay';
 
 interface PasteInputProps {
   onAdd(song: Song): void;
@@ -32,6 +33,11 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
       }
       try {
         const song = await resolve(id);
+        // 가사 비주얼라이저이므로, 가사를 못 찾은 곡은 추가하지 않고 다른 링크를 권한다.
+        if (song.lyrics.type === 'none') {
+          newErrors.push(`이 링크는 가사를 찾을 수 없어요 — 다른 유튜브 링크를 넣어주세요: ${line}`);
+          continue;
+        }
         onAdd(song);
         addedAny = true;
       } catch (err) {
@@ -54,6 +60,7 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
 
   return (
     <div className="flex flex-col gap-2">
+      <LoadingOverlay show={busy} />
       <textarea
         aria-label="youtube links"
         value={value}

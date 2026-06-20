@@ -17,7 +17,7 @@ vi.mock('../lib/youtube', () => ({
 
 import PasteInput from './PasteInput';
 
-function makeSong(id: string): Song {
+function makeSong(id: string, lyricsType: Song['lyrics']['type'] = 'synced'): Song {
   return {
     id,
     title: 't',
@@ -25,7 +25,10 @@ function makeSong(id: string): Song {
     durationSec: 100,
     cover: 'c.jpg',
     colors: { gradientFrom: '#000', gradientTo: '#111', accent: '#222' },
-    lyrics: { type: 'none', source: 'none', offsetMs: 0 },
+    lyrics:
+      lyricsType === 'synced'
+        ? { type: 'synced', synced: [{ time: 0, text: 'la' }], source: 'lrclib', offsetMs: 0 }
+        : { type: lyricsType, source: lyricsType === 'plain' ? 'lrclib' : 'none', offsetMs: 0 },
     resolvedAt: '2026-06-20T00:00:00.000Z',
   };
 }
@@ -58,6 +61,17 @@ describe('PasteInput', () => {
     await userEvent.paste('https://youtu.be/aaaaaaaaaa1\nhttps://youtu.be/bbbbbbbbbb2');
     await userEvent.click(screen.getByRole('button', { name: /add/i }));
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(2));
+  });
+
+  it('does NOT add a song with no lyrics and asks for a different link', async () => {
+    resolveMock.mockResolvedValue(makeSong('abcDEF12345', 'none'));
+    const onAdd = vi.fn();
+    render(<PasteInput onAdd={onAdd} />);
+    await userEvent.type(screen.getByRole('textbox'), 'https://youtu.be/abcDEF12345');
+    await userEvent.click(screen.getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(screen.getByTestId('paste-error')).toBeInTheDocument());
+    expect(screen.getByTestId('paste-error')).toHaveTextContent('가사를 찾을 수 없어요');
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it('shows an error for an unparseable line and does not call onAdd', async () => {
