@@ -75,7 +75,7 @@ export default function Player() {
             <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} />
           </div>
           <div className="flex min-h-0 items-stretch justify-center">
-            <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} />
+            <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} accent={colors.accent} />
           </div>
           <div className="lg:col-span-2">
             <Controls

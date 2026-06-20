@@ -28,6 +28,21 @@ describe('LyricsView', () => {
     expect(screen.getByText('third line')).toHaveAttribute('data-active', 'false');
   });
 
+  it('applies an accent-tinted glow to the active line only (spec §7)', () => {
+    render(<LyricsView lyrics={synced} activeIndex={1} accent="#ff0066" />);
+    const active = screen.getByText('second line');
+    const inactive = screen.getByText('first line');
+    expect(active.style.textShadow).toContain('#ff0066');
+    expect(active.style.textShadow).toContain('24px');
+    // the glow must not bleed onto non-active lines
+    expect(inactive.style.textShadow).toBe('');
+  });
+
+  it('omits the glow when no accent is provided (back-compat)', () => {
+    render(<LyricsView lyrics={synced} activeIndex={1} />);
+    expect(screen.getByText('second line').style.textShadow).toBe('');
+  });
+
   it('translates the container up proportional to activeIndex', () => {
     const { container, rerender } = render(<LyricsView lyrics={synced} activeIndex={0} />);
     const track = () =>

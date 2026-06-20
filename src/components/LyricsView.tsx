@@ -3,6 +3,8 @@ import type { SongLyrics } from '../types';
 interface LyricsViewProps {
   lyrics: SongLyrics;
   activeIndex: number;
+  /** 곡의 추출색(accent). 활성 줄에 은은한 글로우를 입힌다(spec §7). */
+  accent?: string;
 }
 
 const LINE_HEIGHT_EM = 3.2; // approximate per-line block height in em
@@ -14,7 +16,13 @@ function opacityForDistance(d: number): number {
   return 0.14;
 }
 
-export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
+export default function LyricsView({ lyrics, activeIndex, accent }: LyricsViewProps) {
+  // 글로우는 모션이 아니라 빛 효과지만, reduced-motion 사용자에겐 더 차분하게(spec §7).
+  const reduced =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const glow = accent && !reduced ? `0 0 24px ${accent}` : undefined;
   if (lyrics.type === 'none' || (lyrics.type === 'synced' && !lyrics.synced?.length)) {
     return (
       <div
@@ -83,7 +91,10 @@ export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
                 'flex min-h-[3.2em] items-center px-4 text-center text-2xl motion-safe:transition-all motion-safe:duration-300 ' +
                 (isActive ? 'motion-safe:scale-105 font-semibold text-white' : 'text-white')
               }
-              style={{ opacity: opacityForDistance(dist) }}
+              style={{
+                opacity: opacityForDistance(dist),
+                ...(isActive && glow ? { textShadow: glow } : null),
+              }}
             >
               {line.text}
             </p>

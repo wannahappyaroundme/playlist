@@ -96,7 +96,7 @@ export default function SharedView() {
             <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} />
           </div>
           <div className="flex items-center justify-center">
-            <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} />
+            <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} accent={colors.accent} />
           </div>
           <div className="lg:col-span-2">
             <Controls
