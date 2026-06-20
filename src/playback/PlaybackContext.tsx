@@ -90,6 +90,8 @@ export interface PlaybackApi {
   cycleRepeat(): void;
   setRepeat(r: RepeatMode): void;
   getCurrentTime(): number;
+  /** 라이브 플레이어 길이(초). 광고 중에는 광고 길이를 반환하므로 곡 길이와 비교해 광고를 감지한다. */
+  getDuration(): number;
 }
 
 const PLAYER_ELEMENT_ID = 'yt-player';
@@ -223,6 +225,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const setRepeat = useCallback((r: RepeatMode) => setRepeatState(r), []);
 
   const getCurrentTime = useCallback(() => playerRef.current?.getCurrentTime() ?? 0, []);
+  const getDuration = useCallback(() => playerRef.current?.getDuration() ?? 0, []);
 
   const current = queue[currentIndex] ?? null;
 
@@ -246,10 +249,11 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       cycleRepeat,
       setRepeat,
       getCurrentTime,
+      getDuration,
     }),
     [
       queue, currentIndex, current, isPlaying, repeat, progress, duration, started, lastError,
-      playQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime,
+      playQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime, getDuration,
     ],
   );
 

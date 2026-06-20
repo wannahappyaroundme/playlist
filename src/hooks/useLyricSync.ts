@@ -42,11 +42,15 @@ export function useLyricSync(
   isPlaying: boolean,
   lines: LyricLine[],
   offsetMs: number,
+  // 광고/메타로딩 등으로 '진짜 곡'이 아직 재생 전이면 false를 반환. 그동안 가사 시계를 멈추고
+  // 첫 줄을 유지하다가, 곡이 시작(true)되면 그 시점 getCurrentTime(보통 ~0)부터 재동기화한다.
+  contentReady?: () => boolean,
 ): number {
   const [activeIndex, setActiveIndex] = useState(-1);
   const sampleRef = useRef<TimeSample>({ time: 0, at: 0 });
   const lastSampledAtRef = useRef(0);
   const indexRef = useRef(-1);
+  const primedRef = useRef(false);
 
   useEffect(() => {
     indexRef.current = activeIndex;
@@ -55,11 +59,27 @@ export function useLyricSync(
   useEffect(() => {
     if (!isPlaying) return;
     let raf = 0;
-    // prime an immediate sample so the first frame is accurate
-    sampleRef.current = { time: getCurrentTime(), at: performance.now() };
-    lastSampledAtRef.current = sampleRef.current.at;
+    primedRef.current = false;
+
+    const prime = (now: number) => {
+      sampleRef.current = { time: getCurrentTime(), at: now };
+      lastSampledAtRef.current = now;
+      primedRef.current = true;
+    };
 
     const tick = (now: number) => {
+      // 콘텐츠 미준비(광고/로딩): 가사 시계 정지 + 첫 줄 유지, 준비되면 그때부터 prime.
+      if (contentReady && !contentReady()) {
+        if (indexRef.current !== -1) {
+          indexRef.current = -1;
+          setActiveIndex(-1);
+        }
+        primedRef.current = false;
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (!primedRef.current) prime(now); // 진입/재개 시 현재 재생초로 정렬
+
       const intervalElapsed = now - lastSampledAtRef.current >= SAMPLE_INTERVAL_MS;
       // 보간 추정치가 실제 재생 위치에서 크게 벗어났으면(seek/일시정지 복귀) 즉시 재샘플.
       const estimated = estimateTime(sampleRef.current, now, true);
@@ -77,7 +97,7 @@ export function useLyricSync(
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [getCurrentTime, isPlaying, lines, offsetMs]);
+  }, [getCurrentTime, isPlaying, lines, offsetMs, contentReady]);
 
   return activeIndex;
 }

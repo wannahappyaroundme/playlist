@@ -1,9 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { thumbnailUrl } from '../lib/youtube';
+import { getSong } from '../lib/storage';
+import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb } from '../lib/colors';
 import AppBackground from '../components/AppBackground';
 
 const EMPTY_BOX = 'aspect-square rounded-xl bg-white/5';
+
+// 곡 추출색(accent)으로 카드 전체를 같은 색상의 '밝게→어둡게' 그라데이션으로 칠한다.
+// 추출색이 어두워도 채도를 끌어올려 '플레이리스트'처럼 또렷한 색이 보이게 하고,
+// 아래쪽은 충분히 어둡게 둬서 흰 제목이 읽히도록 한다.
+function cardGradient(accent: string): string {
+  const [h, s] = rgbToHsl(...hexToRgb(accent));
+  const sat = Math.max(s, 0.62);
+  const top = rgbToHex(...hslToRgb(h, sat, 0.5));
+  const bottom = rgbToHex(...hslToRgb(h, Math.max(s, 0.5), 0.16));
+  return `linear-gradient(160deg, ${top} 0%, ${bottom} 100%)`;
+}
 
 function CoverThumb({ id, playlistId }: { id?: string; playlistId: string }) {
   if (!id) {
@@ -64,15 +77,28 @@ export default function Gallery() {
         </div>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {playlists.map((p) => (
+          {playlists.map((p) => {
+            const coverId = p.coverVideoId ?? p.songIds[0];
+            // 대표곡의 추출색으로 카드를 물들여 '플레이리스트'처럼 컬러풀하게(곡마다 다른 빛).
+            const colors = coverId ? getSong(coverId)?.colors : undefined;
+            const cardStyle = colors
+              ? { backgroundImage: cardGradient(colors.accent) }
+              : undefined;
+            return (
             <li key={p.id}>
               <Link
                 to={`/p/${p.id}`}
-                className="block rounded-2xl bg-white/10 p-4 backdrop-blur transition hover:bg-white/15"
+                style={cardStyle}
+                className={
+                  'block rounded-2xl p-4 backdrop-blur transition ' +
+                  (colors
+                    ? 'ring-1 ring-white/10 hover:brightness-110'
+                    : 'bg-white/10 hover:bg-white/15')
+                }
               >
-                <CoverThumb id={p.coverVideoId ?? p.songIds[0]} playlistId={p.id} />
-                <p className="mt-3 truncate text-sm font-medium">{p.title}</p>
-                <p className="mt-1 text-xs text-white/50">{p.songIds.length}곡</p>
+                <CoverThumb id={coverId} playlistId={p.id} />
+                <p className="mt-3 truncate text-sm font-medium drop-shadow">{p.title}</p>
+                <p className="mt-1 text-xs text-white/70">{p.songIds.length}곡</p>
               </Link>
               <div className="mt-1 flex items-center justify-between">
                 <Link to={`/edit/${p.id}`} className="text-xs text-white/40 hover:text-white/70">
@@ -88,7 +114,8 @@ export default function Gallery() {
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

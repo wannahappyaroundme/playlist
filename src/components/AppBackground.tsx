@@ -9,8 +9,8 @@ export default function AppBackground() {
         style={{ backgroundImage: `url(${import.meta.env.BASE_URL}background.jpg)` }}
       />
       {/* readability: darken overall + slightly stronger top/bottom for header & edges */}
-      <div className="absolute inset-0 bg-black/55" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/30 to-black/65" />
+      <div className="absolute inset-0 bg-black/68" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/45 to-black/80" />
     </div>
   );
 }

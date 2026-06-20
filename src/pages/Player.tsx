@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPlaylist, getSong } from '../lib/storage';
 import { usePlayback } from '../playback/PlaybackContext';
@@ -38,11 +38,19 @@ export default function Player() {
   }, [songs, startIndex]);
 
   const current = playback.current;
+  const { getDuration } = playback;
+  const expectedDur = current?.durationSec ?? 0;
+  // 광고/로딩 감지: 라이브 재생 길이가 곡 길이와 크게 다르면 아직 '진짜 곡'이 아님(보통 선광고).
+  const contentReady = useCallback(() => {
+    if (expectedDur <= 0) return true; // 길이 정보 없으면 게이트하지 않음(과차단 방지)
+    return Math.abs(getDuration() - expectedDur) <= Math.max(6, expectedDur * 0.05);
+  }, [getDuration, expectedDur]);
   const activeIndex = useLyricSync(
     playback.getCurrentTime,
     playback.isPlaying,
     current?.lyrics.synced ?? [],
     current?.lyrics.offsetMs ?? 0,
+    contentReady,
   );
 
   if (songs.length === 0) {
@@ -56,10 +64,22 @@ export default function Player() {
 
   const colors = current?.colors ?? { gradientFrom: '#0b1020', gradientTo: '#05070f', accent: '#6b7cff' };
 
+  // 광고/로딩 동안엔 라이브 길이가 곡 길이와 달라 가사가 멈춰 있다 — 사용자에게 이유를 알려준다.
+  const adOrLoading =
+    playback.started &&
+    playback.isPlaying &&
+    expectedDur > 0 &&
+    Math.abs(playback.duration - expectedDur) > Math.max(6, expectedDur * 0.05);
+
   return (
     <div className="relative h-[100dvh] overflow-hidden text-white">
       <GradientBg colors={colors} />
       <SkipToast error={playback.lastError} />
+      {adOrLoading ? (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-black/55 px-4 py-1.5 text-xs text-white/80 backdrop-blur">
+          잠시 후 가사가 시작돼요…
+        </div>
+      ) : null}
 
       {!playback.started || !current ? (
         <PlayGate
