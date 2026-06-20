@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPlaylist, savePlaylist, getSong } from '../lib/storage';
-import { encodePlaylist } from '../lib/share';
+import { buildSharePayload } from '../lib/share';
 import PasteInput from '../components/PasteInput';
 import SongCard from '../components/SongCard';
 import QrShare from '../components/QrShare';
-import type { Song, Playlist, SharedPlaylist } from '../types';
+import type { Song, Playlist } from '../types';
 
 export default function Editor() {
   const { playlistId } = useParams();
@@ -49,15 +49,11 @@ export default function Editor() {
     persist({ ...playlist, songIds: ids });
   };
 
-  const shareUrl = (() => {
-    const payload: SharedPlaylist = {
-      title: playlist.title,
-      message: playlist.message,
-      songs: songs.map((s) => ({ id: s.id, title: s.title })),
-    };
-    const encoded = encodePlaylist(payload);
-    return `${window.location.origin}${window.location.pathname}#/s/${encoded}`;
-  })();
+  const { encoded } = buildSharePayload(
+    { title: playlist.title, message: playlist.message },
+    songs.map((s) => ({ id: s.id, title: s.title })),
+  );
+  const shareUrl = `${window.location.origin}${window.location.pathname}#/s/${encoded}`;
 
   return (
     <div className="min-h-screen px-6 py-10 text-white">

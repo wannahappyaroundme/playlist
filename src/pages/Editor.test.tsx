@@ -12,7 +12,9 @@ vi.mock('../lib/storage', () => ({
   savePlaylist: (...a: any[]) => savePlaylistMock(...a),
   getSong: (...a: any[]) => getSongMock(...a),
 }));
-vi.mock('../lib/share', () => ({ encodePlaylist: () => 'ENC' }));
+vi.mock('../lib/share', () => ({
+  buildSharePayload: () => ({ encoded: 'ENC', titlesDropped: false }),
+}));
 
 let lastOnAdd: ((s: Song) => void) | null = null;
 vi.mock('../components/PasteInput', () => ({

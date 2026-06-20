@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SharedPlaylist } from '../types';
-import { decodePlaylist, encodePlaylist } from './share';
+import { buildSharePayload, decodePlaylist, encodePlaylist } from './share';
 
 const sample: SharedPlaylist = {
   title: '심야의 라운지',
@@ -23,6 +23,35 @@ describe('encodePlaylist', () => {
     const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
     const json = new TextDecoder().decode(bytes);
     expect(JSON.parse(json)).toEqual(sample);
+  });
+});
+
+describe('buildSharePayload (Fix 17+18)', () => {
+  const songs = [
+    { id: 'aaaaaaaaaaa', title: '아주 긴 한글 제목입니다 정말로 길어요' },
+    { id: 'bbbbbbbbbbb', title: '또 다른 매우 긴 한글 제목 텍스트' },
+  ];
+
+  it('keeps titles when the encoding stays under the threshold', () => {
+    const r = buildSharePayload({ title: 'L', message: 'm' }, songs, 100000);
+    expect(r.titlesDropped).toBe(false);
+    const decoded = decodePlaylist(r.encoded);
+    expect(decoded?.songs[0].title).toBe(songs[0].title);
+  });
+
+  it('drops titles (id-only) when the title-rich encoding exceeds the threshold', () => {
+    // tiny threshold forces the slim path
+    const r = buildSharePayload({ title: 'L', message: 'm' }, songs, 10);
+    expect(r.titlesDropped).toBe(true);
+    const decoded = decodePlaylist(r.encoded);
+    expect(decoded?.songs.map((s) => s.id)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    expect(decoded?.songs.every((s) => s.title === undefined)).toBe(true);
+  });
+
+  it('id-only encoding is strictly shorter than the title-rich one', () => {
+    const full = buildSharePayload({ title: 'L' }, songs, 100000).encoded;
+    const slim = buildSharePayload({ title: 'L' }, songs, 1).encoded;
+    expect(slim.length).toBeLessThan(full.length);
   });
 });
 
@@ -81,6 +110,14 @@ describe('decodePlaylist', () => {
     expect(
       decodePlaylist(enc({ title: 'x', songs: [{ id: 'aaaaaaaaaaa' }, { id: 'bad' }] })),
     ).toBeNull();
+  });
+
+  it('decodes a title-dropped (id-only) payload built by buildSharePayload', () => {
+    const songs = [{ id: 'aaaaaaaaaaa', title: 'A' }, { id: 'bbbbbbbbbbb', title: 'B' }];
+    const { encoded } = buildSharePayload({ title: 'L', message: 'm' }, songs, 1);
+    const decoded = decodePlaylist(encoded);
+    expect(decoded?.songs.map((s) => s.id)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    expect(decoded?.songs.every((s) => s.title === undefined)).toBe(true);
   });
 
   it('accepts a payload with all valid 11-char ids', () => {

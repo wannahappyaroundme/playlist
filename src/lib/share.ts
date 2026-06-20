@@ -15,6 +15,42 @@ export function encodePlaylist(p: SharedPlaylist): string {
   return bytesToBase64Url(bytes);
 }
 
+// Conservative cap for a comfortably shareable encoded payload (messenger/QR).
+export const SHARE_ENCODED_MAX = 1800;
+
+export interface BuildSharePayloadResult {
+  encoded: string;
+  /** true when titles were dropped (id-only) to stay under SHARE_ENCODED_MAX */
+  titlesDropped: boolean;
+}
+
+/**
+ * Fix 17+18: build the encoded share payload, preferring to include song titles
+ * for nicer previews, but dropping them (id-only) when the title-rich encoding
+ * exceeds SHARE_ENCODED_MAX. Decoder already treats title as optional.
+ */
+export function buildSharePayload(
+  meta: { title: string; message?: string },
+  songs: { id: string; title: string }[],
+  maxEncoded: number = SHARE_ENCODED_MAX,
+): BuildSharePayloadResult {
+  const withTitles: SharedPlaylist = {
+    title: meta.title,
+    message: meta.message,
+    songs: songs.map((s) => ({ id: s.id, title: s.title })),
+  };
+  const full = encodePlaylist(withTitles);
+  if (full.length <= maxEncoded) {
+    return { encoded: full, titlesDropped: false };
+  }
+  const slim: SharedPlaylist = {
+    title: meta.title,
+    message: meta.message,
+    songs: songs.map((s) => ({ id: s.id })),
+  };
+  return { encoded: encodePlaylist(slim), titlesDropped: true };
+}
+
 function base64UrlToBytes(encoded: string): Uint8Array {
   const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
   const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
