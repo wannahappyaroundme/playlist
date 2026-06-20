@@ -76,4 +76,23 @@ describe('Gallery', () => {
     expect(createMock).toHaveBeenCalledWith('새 플레이리스트');
     expect(navigateMock).toHaveBeenCalledWith('/edit/genid');
   });
+
+  it('clicking 삭제 with a confirmed prompt calls remove(id)', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderGallery();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 삭제' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(removeMock).toHaveBeenCalledWith('aa');
+    confirmSpy.mockRestore();
+  });
+
+  it('cancelling the delete prompt does not call remove', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderGallery();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 삭제' }));
+    expect(removeMock).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
 });

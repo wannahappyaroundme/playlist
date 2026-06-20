@@ -27,13 +27,19 @@ function CoverThumb({ id, playlistId }: { id?: string; playlistId: string }) {
 }
 
 export default function Gallery() {
-  const { playlists, create } = usePlaylists();
+  const { playlists, create, remove } = usePlaylists();
   const navigate = useNavigate();
 
   const handleNew = () => {
     const title = '새 플레이리스트';
     const p = create(title);
     navigate(`/edit/${p.id}`);
+  };
+
+  const handleDelete = (id: string, title: string) => {
+    if (window.confirm(`"${title}" 플레이리스트를 삭제할까요?`)) {
+      remove(id);
+    }
   };
 
   return (
@@ -66,9 +72,19 @@ export default function Gallery() {
                 <p className="mt-3 truncate text-sm font-medium">{p.title}</p>
                 <p className="mt-1 text-xs text-white/50">{p.songIds.length}곡</p>
               </Link>
-              <Link to={`/edit/${p.id}`} className="mt-1 block text-xs text-white/40 hover:text-white/70">
-                편집
-              </Link>
+              <div className="mt-1 flex items-center justify-between">
+                <Link to={`/edit/${p.id}`} className="text-xs text-white/40 hover:text-white/70">
+                  편집
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`${p.title} 삭제`}
+                  onClick={() => handleDelete(p.id, p.title)}
+                  className="text-xs text-white/40 transition hover:text-red-300"
+                >
+                  삭제
+                </button>
+              </div>
             </li>
           ))}
         </ul>
