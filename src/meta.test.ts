@@ -32,7 +32,8 @@ describe('index.html Open Graph / Twitter meta', () => {
     expect(html).toContain('property="og:type"');
     expect(html).toContain('content="website"');
     expect(html).toContain('property="og:image"');
-    expect(html).toContain('content="og.png"');
+    // absolute URL to the optimized jpg (crawlers often can't read relative OG images)
+    expect(html).toContain('https://wannahappyaroundme.github.io/playlist/og.jpg');
   });
 
   it('mirrors a Twitter summary_large_image card', () => {
