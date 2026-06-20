@@ -20,9 +20,10 @@ describe('useSongResolver (smoke)', () => {
     vi.clearAllMocks();
   });
 
-  it('mounts and exposes resolve + resolving=false', () => {
+  it('mounts and exposes resolve + reResolve + resolving=false', () => {
     const { result } = renderHook(() => useSongResolver());
     expect(typeof result.current.resolve).toBe('function');
+    expect(typeof result.current.reResolve).toBe('function');
     expect(result.current.resolving).toBe(false);
   });
 });

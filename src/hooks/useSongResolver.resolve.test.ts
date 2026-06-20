@@ -69,4 +69,21 @@ describe('resolveSongWith', () => {
     expect(song.lyrics.type).toBe('none');
     expect(song.lyrics.source).toBe('none');
   });
+
+  // reResolve의 핵심 계약: 캐시를 보지 않고(파이프라인에 getSong 의존이 없음) 항상 풀 파이프라인을
+  // 돌려 saveSong으로 덮어쓴다. 같은 id를 두 번 돌려도 매번 getMeta/fetchLyrics/saveSong이 호출된다.
+  it('always runs the full pipeline and overwrites (no cache short-circuit) — powers reResolve', async () => {
+    const deps = makeDeps();
+    // 첫 호출: none 가사로 캐시 고착됐다고 가정하는 상황
+    await resolveSongWith('abc12345678', deps);
+    // 두 번째 호출(=reResolve): 캐시를 무시하고 다시 전체 파이프라인 + 저장
+    const second = await resolveSongWith('abc12345678', deps);
+
+    expect((deps.getMeta as any).mock.calls.length).toBe(2);
+    expect((deps.fetchLyrics as any).mock.calls.length).toBe(2);
+    expect((deps.saveSong as any).mock.calls.length).toBe(2);
+    // 재실행 결과가 다시 저장되어 stale none을 덮어쓴다
+    expect(second.lyrics.type).toBe('synced');
+    expect((deps.saveSong as any).mock.calls[1][0].id).toBe('abc12345678');
+  });
 });

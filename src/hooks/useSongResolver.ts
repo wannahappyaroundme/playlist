@@ -151,6 +151,12 @@ export async function resolveSongWith(videoId: string, deps: ResolveDeps): Promi
 
 export interface SongResolver {
   resolve(videoId: string): Promise<Song>;
+  /**
+   * 캐시를 무시하고 전체 resolve 파이프라인을 강제로 다시 실행해 storage.saveSong으로 덮어쓴다.
+   * lyrics.type==='none'이거나 메타가 틀린 곡의 '가사/메타 다시 찾기' 버튼이 사용한다.
+   * resolve()와 달리 어떤 캐시 단축도 하지 않는다.
+   */
+  reResolve(videoId: string): Promise<Song>;
   resolving: boolean;
 }
 
@@ -251,7 +257,9 @@ export function useSongResolver(): SongResolver {
     [ensureProbe],
   );
 
-  const resolve = useCallback(
+  // resolve와 reResolve가 공유하는 전체 파이프라인 실행. resolveSongWith는 캐시를 보지 않고
+  // 항상 풀 파이프라인을 돌려 saveSong으로 덮어쓴다(= reResolve의 '강제 갱신' 의미를 그대로 만족).
+  const runFullResolve = useCallback(
     async (videoId: string): Promise<Song> => {
       setResolving(true);
       try {
@@ -269,5 +277,17 @@ export function useSongResolver(): SongResolver {
     [getMeta],
   );
 
-  return { resolve, resolving };
+  const resolve = useCallback(
+    (videoId: string): Promise<Song> => runFullResolve(videoId),
+    [runFullResolve],
+  );
+
+  // 캐시된 곡(가사 none/잘못된 메타)을 강제로 다시 찾는다. resolve와 동일한 풀 파이프라인을
+  // 거치되, 어떤 캐시 단축도 하지 않음을 시그니처로 보장한다(UI '다시 찾기' 버튼용).
+  const reResolve = useCallback(
+    (videoId: string): Promise<Song> => runFullResolve(videoId),
+    [runFullResolve],
+  );
+
+  return { resolve, reResolve, resolving };
 }

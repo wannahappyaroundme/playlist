@@ -35,6 +35,7 @@ vi.mock('../lib/lrclib', () => ({ fetchLyrics: vi.fn(async () => null) }));
 vi.mock('../lib/storage', () => ({ saveSong: vi.fn() }));
 
 import { useSongResolver } from './useSongResolver';
+import { saveSong } from '../lib/storage';
 
 const PROBE_ID = 'yejin-probe';
 
@@ -57,5 +58,26 @@ describe('useSongResolver cleanup on unmount', () => {
 
     expect(destroySpy).toHaveBeenCalledTimes(1);
     expect(document.getElementById(PROBE_ID)).toBeNull();
+  });
+});
+
+describe('useSongResolver.reResolve', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    document.getElementById(PROBE_ID)?.remove();
+  });
+
+  it('runs the full pipeline and overwrites via saveSong (ignores cache)', async () => {
+    const { result } = renderHook(() => useSongResolver());
+
+    let song: Awaited<ReturnType<typeof result.current.reResolve>> | undefined;
+    await act(async () => {
+      song = await result.current.reResolve('abc12345678');
+    });
+
+    // full pipeline ran: meta resolved into a Song and persisted via saveSong
+    expect(song?.id).toBe('abc12345678');
+    expect(saveSong).toHaveBeenCalledTimes(1);
+    expect((saveSong as any).mock.calls[0][0].id).toBe('abc12345678');
   });
 });
