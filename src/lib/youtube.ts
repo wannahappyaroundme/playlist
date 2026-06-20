@@ -187,14 +187,15 @@ function stripNoise(s: string): string {
     .trim();
 }
 
-// 공백-구분자-공백 (hyphen, en-dash, em-dash) 첫 등장
-const SEP_RE = /\s[-–—]\s/;
+// 공백-구분자-공백: hyphen/en-dash/em-dash + underscore(_)/middle-dot(·) 첫 등장
+// (유튜브 제목은 "아티스트 _ 제목", "아티스트 · 제목"도 흔하다)
+const SEP_RE = /\s[-–—_·]\s/;
 
-// 폴백 title에서 매달린 구분자(앞/뒤 ` - `, ` – `, ` — `, 또는 경계의 dash)를 제거
+// 폴백 title에서 매달린 구분자(앞/뒤 ` - `, ` _ `, ` · ` 등)를 제거
 function stripDanglingSeparator(s: string): string {
   return s
-    .replace(/^[\s-–—]+/, '')
-    .replace(/[\s-–—]+$/, '')
+    .replace(/^[\s\-–—_·]+/, '')
+    .replace(/[\s\-–—_·]+$/, '')
     .trim();
 }
 

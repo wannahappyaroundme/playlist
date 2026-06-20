@@ -33,6 +33,19 @@ describe('metaPollDone (probe poll exit condition)', () => {
   it('handles null data without throwing', () => {
     expect(metaPollDone(null, 200, 100, 8000)).toBe(false);
   });
+
+  // 스테일 데이터 거부: 프로브가 직전 곡 데이터를 반환하는 동안은 finish하지 않는다.
+  it('does NOT finish when video_id mismatches the requested id (stale probe data)', () => {
+    expect(metaPollDone(data({ video_id: 'OLDvideoID0' }), 200, 100, 8000, 'abc12345678')).toBe(false);
+  });
+
+  it('finishes when video_id matches the requested id', () => {
+    expect(metaPollDone(data(), 200, 100, 8000, 'abc12345678')).toBe(true);
+  });
+
+  it('still times out even if the id never matches (never hangs)', () => {
+    expect(metaPollDone(data({ video_id: 'OLDvideoID0' }), 200, 8001, 8000, 'abc12345678')).toBe(true);
+  });
 });
 
 function makeDeps(over: Partial<ResolveDeps> = {}): ResolveDeps {

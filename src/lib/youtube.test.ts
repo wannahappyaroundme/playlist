@@ -185,6 +185,17 @@ describe('parseTitleHeuristic', () => {
     });
   });
 
+  it('handles underscore and middle-dot separators', () => {
+    expect(parseTitleHeuristic('빈첸 _ FLYING HIGH WITH U', '')).toEqual({
+      artist: '빈첸',
+      title: 'FLYING HIGH WITH U',
+    });
+    expect(parseTitleHeuristic('Artist · Title', 'Chan')).toEqual({
+      artist: 'Artist',
+      title: 'Title',
+    });
+  });
+
   it('falls back to author when there is no separator', () => {
     expect(parseTitleHeuristic('Blueming (Official Video)', 'IU Official')).toEqual({
       artist: 'IU Official',

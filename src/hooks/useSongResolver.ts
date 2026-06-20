@@ -83,17 +83,21 @@ function resolveError(code: ResolveErrorCode, message: string): ResolveError {
 }
 
 /**
- * 프로브 폴링 종료 조건(순수). title까지 채워져야 finish하며, CUED 상태 단독으로는 끝내지 않는다.
- * 타임아웃(elapsed > timeoutMs)이면 메타가 비어도 종료해 행을 막는다.
+ * 프로브 폴링 종료 조건(순수). title까지 채워지고 **video_id가 요청한 곡과 일치**해야 finish한다.
+ * (프로브 플레이어를 재사용하면 새 영상 로드 전 직전 영상 데이터가 잠깐 반환되므로,
+ *  video_id 일치를 확인하지 않으면 직전 곡 제목을 새 곡에 잘못 저장하게 된다.)
+ * CUED 상태 단독으로는 끝내지 않으며, 타임아웃(elapsed > timeoutMs)이면 메타가 비어도 종료해 행을 막는다.
  */
 export function metaPollDone(
   data: { video_id?: string; title?: string } | null | undefined,
   dur: number,
   elapsed: number,
   timeoutMs: number,
+  expectedId?: string,
 ): boolean {
   if (elapsed > timeoutMs) return true;
-  return !!(data && data.video_id && data.title && dur > 0);
+  if (!(data && data.video_id && data.title && dur > 0)) return false;
+  return !expectedId || data.video_id === expectedId;
 }
 
 export interface ResolveDeps {
@@ -231,7 +235,7 @@ export function useSongResolver(): SongResolver {
           if (probeErroredRef.current) { finish(); return; }
           const data = probe.getVideoData();
           const dur = probe.getDuration();
-          if (metaPollDone(data, dur, Date.now() - start, META_TIMEOUT_MS)) {
+          if (metaPollDone(data, dur, Date.now() - start, META_TIMEOUT_MS, videoId)) {
             finish();
           } else {
             setTimeout(poll, 100);
@@ -241,12 +245,14 @@ export function useSongResolver(): SongResolver {
       });
       const data = probe.getVideoData();
       const dur = probe.getDuration() || 0;
-      const title = data.title || '';
-      // metaReady: 에러 없이 title + duration까지 받았는지(타임아웃/에러 빈-메타 식별용)
+      // video_id가 요청한 곡과 일치할 때만 신뢰(스테일/직전 곡 데이터 거부).
+      const idMatches = data.video_id === videoId;
+      const title = idMatches ? data.title || '' : '';
+      // metaReady: 에러 없이 '요청한 곡'의 title + duration까지 받았는지(타임아웃/에러/스테일 식별용)
       const probeErrored = probeErroredRef.current;
-      const metaReady = !probeErrored && !!(data.video_id && title && dur > 0);
+      const metaReady = !probeErrored && idMatches && !!(data.video_id && title && dur > 0);
       return {
-        video_id: data.video_id || videoId,
+        video_id: videoId,
         title,
         author: data.author || '',
         durationSec: dur,
