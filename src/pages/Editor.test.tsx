@@ -12,7 +12,7 @@ vi.mock('../lib/storage', () => ({
   savePlaylist: (...a: any[]) => savePlaylistMock(...a),
   getSong: (...a: any[]) => getSongMock(...a),
 }));
-const buildSharePayloadMock = vi.fn(() => ({ encoded: 'ENC', titlesDropped: false }));
+const buildSharePayloadMock = vi.fn((..._a: any[]) => ({ encoded: 'ENC', titlesDropped: false }));
 vi.mock('../lib/share', () => ({
   buildSharePayload: (...a: any[]) => buildSharePayloadMock(...a),
 }));

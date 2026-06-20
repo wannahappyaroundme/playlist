@@ -3,8 +3,12 @@ import { render, screen, act } from '@testing-library/react';
 import SkipToast from './SkipToast';
 
 describe('SkipToast', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('renders nothing when there is no error', () => {
     render(<SkipToast error={null} />);
@@ -28,7 +32,9 @@ describe('SkipToast', () => {
 
   it('re-appears when a new error (different at) arrives after dismissal', () => {
     const { rerender } = render(<SkipToast error={{ title: 'A', at: 1 }} durationMs={2000} />);
-    act(() => vi.advanceTimersByTime(2000));
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(screen.queryByTestId('skip-toast')).toBeNull();
     rerender(<SkipToast error={{ title: 'B', at: 2 }} durationMs={2000} />);
     expect(screen.getByTestId('skip-toast')).toHaveTextContent('B 곡은 재생할 수 없어 건너뛰었어요');
