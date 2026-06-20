@@ -12,8 +12,9 @@ vi.mock('../lib/storage', () => ({
   savePlaylist: (...a: any[]) => savePlaylistMock(...a),
   getSong: (...a: any[]) => getSongMock(...a),
 }));
+const buildSharePayloadMock = vi.fn(() => ({ encoded: 'ENC', titlesDropped: false }));
 vi.mock('../lib/share', () => ({
-  buildSharePayload: () => ({ encoded: 'ENC', titlesDropped: false }),
+  buildSharePayload: (...a: any[]) => buildSharePayloadMock(...a),
 }));
 
 let lastOnAdd: ((s: Song) => void) | null = null;
@@ -21,7 +22,12 @@ vi.mock('../components/PasteInput', () => ({
   default: ({ onAdd }: any) => { lastOnAdd = onAdd; return <div data-testid="paste-input" />; },
 }));
 vi.mock('../components/SongCard', () => ({
-  default: ({ song }: any) => <div data-testid="song-card">{song.title}</div>,
+  default: ({ song, onShare }: any) => (
+    <div data-testid="song-card">
+      {song.title}
+      {onShare ? <button aria-label="이 곡만 보내기" onClick={onShare} /> : null}
+    </div>
+  ),
 }));
 vi.mock('../components/QrShare', () => ({
   default: ({ url }: any) => <div data-testid="qr-share">{url}</div>,
@@ -99,5 +105,22 @@ describe('Editor', () => {
     const calls = savePlaylistMock.mock.calls;
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.songIds).toEqual(['s0', 's2']);
+  });
+
+  it('"이 곡만 보내기" reveals a single-song share built from exactly one song', async () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    renderEditor();
+    expect(screen.queryByTestId('single-share')).toBeNull();
+    buildSharePayloadMock.mockClear();
+    const shareButtons = screen.getAllByRole('button', { name: '이 곡만 보내기' });
+    await userEvent.click(shareButtons[1]); // share the second song (s1)
+    // inline single-song QR reveal appears
+    expect(screen.getByTestId('single-share')).toBeInTheDocument();
+    // and the payload was built with a songs array of length exactly 1
+    const singleCall = buildSharePayloadMock.mock.calls.find(
+      (c: any[]) => Array.isArray(c[1]) && c[1].length === 1,
+    );
+    expect(singleCall).toBeTruthy();
+    expect((singleCall as any[])[1]).toEqual([{ id: 's1', title: 'song-s1' }]);
   });
 });

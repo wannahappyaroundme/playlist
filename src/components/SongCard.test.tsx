@@ -61,6 +61,16 @@ describe('SongCard', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('renders an "이 곡만 보내기" action only when onShare is provided', async () => {
+    const onShare = vi.fn();
+    const { rerender } = render(<SongCard song={makeSong()} />);
+    expect(screen.queryByRole('button', { name: '이 곡만 보내기' })).toBeNull();
+    rerender(<SongCard song={makeSong()} onShare={onShare} />);
+    const btn = screen.getByRole('button', { name: '이 곡만 보내기' });
+    await userEvent.click(btn);
+    expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
   it('cover onError downgrades the thumbnail src once (carried fix)', () => {
     render(
       <SongCard

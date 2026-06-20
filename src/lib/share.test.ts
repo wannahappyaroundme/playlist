@@ -53,6 +53,16 @@ describe('buildSharePayload (Fix 17+18)', () => {
     const slim = buildSharePayload({ title: 'L' }, songs, 1).encoded;
     expect(slim.length).toBeLessThan(full.length);
   });
+
+  it('single-song share encodes exactly one song (이 곡만 보내기)', () => {
+    const { encoded } = buildSharePayload(
+      { title: 'Track A' },
+      [{ id: 'aaaaaaaaaaa', title: 'Track A' }],
+    );
+    const decoded = decodePlaylist(encoded);
+    expect(decoded?.songs).toHaveLength(1);
+    expect(decoded?.songs[0].id).toBe('aaaaaaaaaaa');
+  });
 });
 
 describe('decodePlaylist', () => {

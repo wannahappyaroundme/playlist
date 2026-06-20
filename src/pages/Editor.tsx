@@ -12,6 +12,8 @@ export default function Editor() {
   const [playlist, setPlaylist] = useState<Playlist | null>(() =>
     playlistId ? getPlaylist(playlistId) ?? null : null,
   );
+  // "이 곡만 보내기"로 펼쳐진 단일 곡 공유 대상 (videoId). null이면 닫힘.
+  const [shareSongId, setShareSongId] = useState<string | null>(null);
 
   const songs = useMemo<Song[]>(
     () => (playlist ? playlist.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s) : []),
@@ -52,11 +54,24 @@ export default function Editor() {
     persist({ ...playlist, songIds: ids });
   };
 
+  const shareBase = `${window.location.origin}${window.location.pathname}#/s/`;
+
   const { encoded } = buildSharePayload(
     { title: playlist.title, message: playlist.message },
     songs.map((s) => ({ id: s.id, title: s.title })),
   );
-  const shareUrl = `${window.location.origin}${window.location.pathname}#/s/${encoded}`;
+  const shareUrl = `${shareBase}${encoded}`;
+
+  // 단일 곡 공유 URL: 같은 #/s/ 포맷, songs 배열에 곡 하나만.
+  const shareSong = shareSongId ? songs.find((s) => s.id === shareSongId) ?? null : null;
+  const singleShareUrl = shareSong
+    ? `${shareBase}${
+        buildSharePayload(
+          { title: shareSong.title, message: playlist.message },
+          [{ id: shareSong.id, title: shareSong.title }],
+        ).encoded
+      }`
+    : '';
 
   return (
     <div className="min-h-screen px-6 py-10 text-white">
@@ -88,13 +103,24 @@ export default function Editor() {
 
       <ul className="mt-6 space-y-2">
         {songs.map((s, i) => (
-          <li key={s.id} className="flex items-center gap-2">
-            <div className="flex-1">
-              <SongCard song={s} />
+          <li key={s.id} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <SongCard
+                  song={s}
+                  onShare={() => setShareSongId((id) => (id === s.id ? null : s.id))}
+                />
+              </div>
+              <button type="button" aria-label="위로" onClick={() => move(i, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
+              <button type="button" aria-label="아래로" onClick={() => move(i, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
+              <button type="button" aria-label="삭제" onClick={() => removeAt(i)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
             </div>
-            <button type="button" aria-label="위로" onClick={() => move(i, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
-            <button type="button" aria-label="아래로" onClick={() => move(i, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
-            <button type="button" aria-label="삭제" onClick={() => removeAt(i)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
+            {shareSongId === s.id ? (
+              <div data-testid="single-share" className="rounded-2xl bg-white/5 p-4">
+                <p className="mb-3 text-xs text-white/50">이 곡만 공유</p>
+                <QrShare url={singleShareUrl} />
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
