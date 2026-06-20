@@ -15,8 +15,10 @@ vi.mock('../lib/ytPlayer', () => ({
     return new Promise(() => {}); // never resolves
   }),
 }));
+vi.mock('../lib/storage', () => ({ saveSong: vi.fn() }));
 
 import { PlaybackProvider, usePlayback } from './PlaybackContext';
+import { saveSong } from '../lib/storage';
 import type { Song } from '../types';
 
 function installFakePlayer() {
@@ -139,5 +141,59 @@ describe('usePlayback state machine (smoke)', () => {
   it('getCurrentTime returns 0 when no live player', () => {
     const { result } = renderHook(() => usePlayback(), { wrapper });
     expect(result.current.getCurrentTime()).toBe(0);
+  });
+});
+
+describe('usePlayback durationSec self-heal', () => {
+  it('heals a stale durationSec (once) in queue + storage when live duration drifts', async () => {
+    vi.useFakeTimers();
+    try {
+      installFakePlayer();
+      // live duration drifts from stored 100 -> 130 (sane band, >3s & >5%)
+      fakePlayer.getDuration = vi.fn(() => 130);
+      fakePlayer.getCurrentTime = vi.fn(() => 5);
+
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      // wait for the fake player to be installed + handlers captured
+      await vi.waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+
+      act(() => result.current.playQueue([song('a1')], 0)); // song('a1').durationSec === 100
+      // drive isPlaying=true so the 250ms sampler effect starts
+      act(() => capturedHandlers.onStateChange!(1 /* PLAYING */));
+
+      // advance two sampler ticks (async so the interval's setState flushes)
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+
+      // queue durationSec healed to live value
+      expect(result.current.queue[0].durationSec).toBe(130);
+      // persisted once (loop guard: only once per song load)
+      expect((saveSong as any).mock.calls.length).toBe(1);
+      expect((saveSong as any).mock.calls[0][0]).toMatchObject({ id: 'a1', durationSec: 130 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does NOT heal during an ad (live much shorter than stored)', async () => {
+    vi.useFakeTimers();
+    try {
+      installFakePlayer();
+      // 12s pre-roll ad vs stored 100s song -> outside sane band -> no heal
+      fakePlayer.getDuration = vi.fn(() => 12);
+      fakePlayer.getCurrentTime = vi.fn(() => 3);
+
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      await vi.waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+
+      act(() => result.current.playQueue([song('a1')], 0));
+      act(() => capturedHandlers.onStateChange!(1));
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+
+      expect(result.current.queue[0].durationSec).toBe(100); // unchanged
+      expect((saveSong as any).mock.calls.length).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

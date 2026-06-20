@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { createYtPlayer, YT_STATE, type YtPlayer } from '../lib/ytPlayer';
 import { nextIndex, prevIndex } from '../lib/queue';
+import { saveSong } from '../lib/storage';
 import type { Song, RepeatMode } from '../types';
 
 /** 반복 모드 순환: off → all → one → off. */
@@ -65,6 +66,30 @@ export function isPlayingFromState(state: number): boolean | null {
   return null; // BUFFERING / UNSTARTED / CUED → no change
 }
 
+// durationSec 자가치유 판단의 임계값.
+const HEAL_MIN_DIFF_SEC = 3; // 최소 절대 차이(초): 잡음/반올림은 무시
+const HEAL_MIN_DIFF_RATIO = 0.05; // 최소 상대 차이(5%)
+const HEAL_SANE_LOW = 0.5; // live가 stored의 절반 미만이면 광고로 보고 치유 안 함
+const HEAL_SANE_HIGH = 2; // live가 stored의 2배 초과면 비정상으로 보고 치유 안 함
+
+/**
+ * 라이브 getDuration()으로 저장된 durationSec를 자가치유할지 결정하는 순수 헬퍼.
+ * 치유 조건(모두 충족):
+ *  - live > 0 (정상값), stored > 0 (비교 대상 존재)
+ *  - 차이가 충분히 큼: |live-stored| > 3s AND > stored의 5%
+ *  - live가 stored의 합리적 재인코딩 밴드(0.5x~2x) 안 — 선광고(짧음)/이상값(긺)으로 인한
+ *    잘못된 치유를 막는다. 광고는 보통 곡보다 훨씬 짧아 이 밴드 밖이라 걸러진다.
+ */
+export function shouldHealDuration(live: number, stored: number): boolean {
+  if (!(live > 0) || !(stored > 0)) return false;
+  const diff = Math.abs(live - stored);
+  if (diff <= HEAL_MIN_DIFF_SEC) return false;
+  if (diff <= stored * HEAL_MIN_DIFF_RATIO) return false;
+  // 광고/이상값 가드: live가 stored의 0.5x~2x 밖이면 같은 콘텐츠가 아니라고 보고 치유 안 함.
+  if (live < stored * HEAL_SANE_LOW || live > stored * HEAL_SANE_HIGH) return false;
+  return true;
+}
+
 /** 마지막으로 '재생 불가'로 건너뛴 곡 정보(토스트 표시용). at은 중복 갱신 식별자. */
 export interface PlaybackError {
   title: string;
@@ -112,9 +137,13 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const queueRef = useRef(queue);
   const indexRef = useRef(currentIndex);
   const repeatRef = useRef(repeat);
+  // durationSec 자가치유 루프 가드: 곡 로드(현재 인덱스)당 한 번만 치유한다.
+  const healedIndexRef = useRef(-1);
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { indexRef.current = currentIndex; }, [currentIndex]);
   useEffect(() => { repeatRef.current = repeat; }, [repeat]);
+  // 곡이 바뀌면 다음 곡의 치유를 다시 1회 허용한다(곡별 1회 보장).
+  useEffect(() => { healedIndexRef.current = -1; }, [currentIndex]);
 
   const goTo = useCallback((index: number) => {
     const q = queueRef.current;
@@ -174,7 +203,26 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       const p = playerRef.current;
       if (!p) return;
       setProgress(p.getCurrentTime());
-      setDuration(p.getDuration());
+      const live = p.getDuration();
+      setDuration(live);
+      // durationSec 자가치유: 재생 중 라이브 길이가 저장값과 (재인코딩 등으로) 크게 다르면
+      // 곡당 1회 인메모리 큐 + 영속 풀(saveSong)을 갱신해 광고 게이트 오작동 고착을 막는다.
+      const idx = indexRef.current;
+      const cur = queueRef.current[idx];
+      if (cur && healedIndexRef.current !== idx && shouldHealDuration(live, cur.durationSec)) {
+        healedIndexRef.current = idx;
+        const healed: Song = { ...cur, durationSec: live };
+        // 인메모리 큐 갱신(불변 복사로 리렌더 유발 — 광고 게이트가 새 길이를 즉시 사용)
+        setQueue((prev) => {
+          if (prev[idx]?.id !== cur.id) return prev; // 곡이 이미 바뀌었으면 무시
+          const copy = prev.slice();
+          copy[idx] = healed;
+          queueRef.current = copy;
+          return copy;
+        });
+        // 영속 풀도 갱신
+        saveSong(healed);
+      }
     }, 250);
     return () => window.clearInterval(id);
   }, [isPlaying]);
