@@ -62,7 +62,7 @@ export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
     >
       <div
         data-testid="lyrics-track"
-        className="flex flex-col items-center justify-start transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="flex flex-col items-center justify-start motion-safe:transition-transform motion-safe:duration-[450ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
           transform: `translateY(calc(50% + ${translateY}em))`,
           willChange: 'transform',
@@ -76,8 +76,8 @@ export default function LyricsView({ lyrics, activeIndex }: LyricsViewProps) {
               key={`${line.time}-${i}`}
               data-active={String(isActive)}
               className={
-                'flex min-h-[3.2em] items-center px-4 text-center text-2xl transition-all duration-300 ' +
-                (isActive ? 'scale-105 font-semibold text-white' : 'text-white')
+                'flex min-h-[3.2em] items-center px-4 text-center text-2xl motion-safe:transition-all motion-safe:duration-300 ' +
+                (isActive ? 'motion-safe:scale-105 font-semibold text-white' : 'text-white')
               }
               style={{ opacity: opacityForDistance(dist) }}
             >

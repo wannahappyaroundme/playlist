@@ -51,4 +51,25 @@ describe('LyricsView', () => {
     render(<LyricsView lyrics={none} activeIndex={-1} />);
     expect(screen.getByTestId('lyrics-none')).toBeInTheDocument();
   });
+
+  it('scopes the track transition to motion-safe (Fix 8)', () => {
+    const { container } = render(<LyricsView lyrics={synced} activeIndex={1} />);
+    const track = container.querySelector('[data-testid="lyrics-track"]') as HTMLElement;
+    // transition must be motion-safe-scoped so reduced-motion users get no scroll animation
+    expect(track.className).toContain('motion-safe:transition-transform');
+    expect(track.className).not.toMatch(/(^|\s)transition-transform(\s|$)/);
+  });
+
+  it('scopes the active-line scale + transition to motion-safe (Fix 8)', () => {
+    render(<LyricsView lyrics={synced} activeIndex={1} />);
+    const active = screen.getByText('second line');
+    expect(active.className).toContain('motion-safe:scale-105');
+    expect(active.className).toContain('motion-safe:transition-all');
+    // bare (always-on) scale/transition must not be present
+    expect(active.className).not.toMatch(/(^|\s)scale-105(\s|$)/);
+    expect(active.className).not.toMatch(/(^|\s)transition-all(\s|$)/);
+    // color/weight changes stay unconditional (reduced-motion still gets them)
+    expect(active.className).toContain('font-semibold');
+    expect(active.className).toContain('text-white');
+  });
 });
