@@ -71,9 +71,9 @@ export default function Gallery() {
       </header>
 
       {playlists.length === 0 ? (
-        <div className="mt-24 text-center text-white/60">
-          <p className="text-lg">아직 플레이리스트가 없어요.</p>
-          <p className="mt-2 text-sm">위의 “새 플레이리스트” 버튼으로 시작하세요.</p>
+        <div className="mt-28 text-center text-white/75">
+          <p className="text-3xl font-semibold text-white sm:text-4xl">아직 플레이리스트가 없어요.</p>
+          <p className="mt-5 text-lg sm:text-xl">위의 “새 플레이리스트” 버튼으로 시작하세요.</p>
         </div>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
