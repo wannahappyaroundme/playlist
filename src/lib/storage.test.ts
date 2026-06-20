@@ -1,12 +1,16 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Playlist, Song } from '../types';
 import {
+  BackupParseError,
   PLAYLISTS_KEY,
   SONGS_KEY,
+  StorageWriteError,
   createPlaylist,
   deletePlaylist,
+  exportAll,
   getPlaylist,
   getSong,
+  importAll,
   loadPlaylists,
   loadSongs,
   makeSlug,
@@ -185,5 +189,92 @@ describe('createPlaylist', () => {
   it('does not persist by itself (loadPlaylists stays empty)', () => {
     createPlaylist('y', { rand: () => 'zzzz' });
     expect(loadPlaylists()).toEqual([]);
+  });
+});
+
+describe('backup export / import', () => {
+  it('exportAll round-trips songs + playlists through importAll (replace)', () => {
+    const s = makeSong({ id: 'song0000001', title: 'Backed Up' });
+    const p = makePlaylist({ id: 'pl-aaaa', title: 'List A', songIds: ['song0000001'] });
+    saveSong(s);
+    savePlaylist(p);
+
+    const json = exportAll();
+    // wipe storage, then import back with merge:false (replace)
+    localStorage.clear();
+    expect(loadSongs()).toEqual({});
+    expect(loadPlaylists()).toEqual([]);
+
+    const counts = importAll(json, { merge: false });
+    expect(counts).toEqual({ songs: 1, playlists: 1 });
+    expect(getSong('song0000001')).toEqual(s);
+    expect(getPlaylist('pl-aaaa')).toEqual(p);
+  });
+
+  it('exportAll serializes the current pool + playlists with version 1', () => {
+    saveSong(makeSong({ id: 'song0000001' }));
+    savePlaylist(makePlaylist({ id: 'pl-aaaa' }));
+    const parsed = JSON.parse(exportAll());
+    expect(parsed.version).toBe(1);
+    expect(parsed.songs).toHaveProperty('song0000001');
+    expect(parsed.playlists).toHaveLength(1);
+  });
+
+  it('importAll merges songs by id (imported value wins) by default', () => {
+    saveSong(makeSong({ id: 'keep0000001', title: 'Existing Keep' }));
+    saveSong(makeSong({ id: 'over0000001', title: 'Old Value' }));
+    const json = JSON.stringify({
+      version: 1,
+      songs: {
+        over0000001: makeSong({ id: 'over0000001', title: 'New Value' }),
+        new00000001: makeSong({ id: 'new00000001', title: 'Fresh' }),
+      },
+      playlists: [],
+    });
+    const counts = importAll(json); // merge defaults to true
+    expect(counts.songs).toBe(2);
+    expect(getSong('keep0000001')?.title).toBe('Existing Keep'); // untouched
+    expect(getSong('over0000001')?.title).toBe('New Value'); // overwritten
+    expect(getSong('new00000001')?.title).toBe('Fresh'); // added
+  });
+
+  it('importAll merge appends playlists, re-slugging on id collision', () => {
+    savePlaylist(makePlaylist({ id: 'pl-aaaa', title: 'Original' }));
+    const json = JSON.stringify({
+      version: 1,
+      songs: {},
+      playlists: [makePlaylist({ id: 'pl-aaaa', title: 'Imported Same Id' })],
+    });
+    const counts = importAll(json);
+    expect(counts.playlists).toBe(1);
+    const all = loadPlaylists();
+    expect(all).toHaveLength(2);
+    expect(all[0].title).toBe('Original');
+    expect(all[0].id).toBe('pl-aaaa');
+    // appended one kept its data but got a fresh, non-colliding id
+    const imported = all[1];
+    expect(imported.title).toBe('Imported Same Id');
+    expect(imported.id).not.toBe('pl-aaaa');
+  });
+
+  it('importAll throws BackupParseError on malformed JSON', () => {
+    expect(() => importAll('{not json')).toThrow(BackupParseError);
+  });
+
+  it('importAll throws BackupParseError on wrong shape', () => {
+    expect(() => importAll(JSON.stringify({ version: 1 }))).toThrow(BackupParseError);
+    expect(() => importAll(JSON.stringify({ songs: [], playlists: [] }))).toThrow(BackupParseError);
+    expect(() => importAll(JSON.stringify({ songs: {}, playlists: {} }))).toThrow(BackupParseError);
+  });
+
+  it('writeJson surfaces QuotaExceededError as StorageWriteError', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    try {
+      expect(() => saveSong(makeSong())).toThrow(StorageWriteError);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
