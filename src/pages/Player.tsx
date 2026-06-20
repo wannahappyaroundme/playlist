@@ -14,11 +14,14 @@ export default function Player() {
   const { playlistId, songId } = useParams();
   const playback = usePlayback();
 
-  const songs = useMemo<Song[]>(() => {
-    if (!playlistId) return [];
+  const { songs, message } = useMemo<{ songs: Song[]; message?: string }>(() => {
+    if (!playlistId) return { songs: [] };
     const pl = getPlaylist(playlistId);
-    if (!pl) return [];
-    return pl.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s);
+    if (!pl) return { songs: [] };
+    return {
+      songs: pl.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s),
+      message: pl.message,
+    };
   }, [playlistId]);
 
   const startIndex = useMemo(() => {
@@ -59,6 +62,7 @@ export default function Player() {
         <PlayGate
           cover={current?.cover ?? ''}
           colors={colors}
+          message={message}
           onPlay={playback.start}
         />
       ) : (

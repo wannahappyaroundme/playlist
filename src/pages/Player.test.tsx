@@ -15,7 +15,9 @@ vi.mock('../components/LpDisc', () => ({ default: () => <div>LPDISC</div> }));
 vi.mock('../components/LyricsView', () => ({ default: () => <div>LYRICS</div> }));
 vi.mock('../components/Controls', () => ({ default: () => <div>CONTROLS</div> }));
 vi.mock('../components/PlayGate', () => ({
-  default: ({ onPlay }: any) => <button onClick={onPlay}>PLAYGATE</button>,
+  default: ({ onPlay, message }: any) => (
+    <button onClick={onPlay}>{message ? `PLAYGATE:${message}` : 'PLAYGATE'}</button>
+  ),
 }));
 
 const getPlaylistMock = vi.fn();
@@ -32,8 +34,8 @@ const song = (id: string): Song => ({
   cover: 'c', colors: { gradientFrom: '#111', gradientTo: '#000', accent: '#abc' },
   lyrics: { type: 'none', source: 'none', offsetMs: 0 }, resolvedAt: '2026-06-20',
 });
-const pl = (songIds: string[]): Playlist => ({
-  id: 'pl1', title: 'L', songIds, createdAt: '2026-06-20',
+const pl = (songIds: string[], message?: string): Playlist => ({
+  id: 'pl1', title: 'L', songIds, createdAt: '2026-06-20', message,
 });
 
 function renderAt(path: string) {
@@ -77,6 +79,12 @@ describe('Player', () => {
   it('shows PlayGate when not started', () => {
     renderAt('/p/pl1');
     expect(screen.getByText('PLAYGATE')).toBeInTheDocument();
+  });
+
+  it('passes the stored playlist message to PlayGate', () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1'], '너에게 보내는 한 곡'));
+    renderAt('/p/pl1');
+    expect(screen.getByText('PLAYGATE:너에게 보내는 한 곡')).toBeInTheDocument();
   });
 
   it('shows player surface (Controls) once started', () => {
