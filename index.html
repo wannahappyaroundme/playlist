@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Yejin Playlist</title>
 
+    <!-- Content-Security-Policy: whitelist the only external origins this static app
+         uses (YouTube embed/API, ytimg thumbnails, LRCLIB lyrics, jsDelivr font).
+         localhost/ws entries are inert in production and keep `npm run dev` HMR working. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net https://fastly.jsdelivr.net; img-src 'self' data: blob: https://i.ytimg.com https://*.ytimg.com https://img.youtube.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://lrclib.net https://www.youtube.com https://*.ytimg.com ws://localhost:* http://localhost:*; base-uri 'self'; object-src 'none'"
+    />
+
     <!-- Privacy: personal / non-public app (spec §12). Keep search engines out. -->
     <meta name="robots" content="noindex, nofollow" />
 

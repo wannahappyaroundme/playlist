@@ -35,3 +35,14 @@ the site is served from, or every asset 404s.
 
 If assets 404 after deploy, the `base` does not match the served path — fix
 `VITE_BASE` (or the repo name) so they line up.
+
+## E2E smoke test (real browser)
+
+Unit tests (`npm test`) run in jsdom and cannot exercise the YouTube IFrame /
+LRCLIB / canvas color path. To verify the real runtime end-to-end:
+
+```bash
+npm run build
+npm run preview -- --port 4173 --strictPort &
+npm run e2e   # drives a headless browser: paste link -> resolve -> play -> lyrics
+```
