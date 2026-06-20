@@ -63,7 +63,7 @@ export default function SharedView() {
   const saveToLibrary = () => {
     if (!shared) return;
     const p = createPlaylist(shared.title);
-    const withSongs = { ...p, message: shared.message, songIds: songs.map((s) => s.id) };
+    const withSongs = { ...p, message: shared.message, from: shared.from, songIds: songs.map((s) => s.id) };
     savePlaylist(withSongs);
     navigate(`/edit/${p.id}`);
   };
@@ -89,7 +89,7 @@ export default function SharedView() {
           불러오는 중…
         </div>
       ) : !playback.started || !current ? (
-        <PlayGate cover={current?.cover ?? ''} colors={colors} message={shared.message} onPlay={playback.start} />
+        <PlayGate cover={current?.cover ?? ''} colors={colors} message={shared.message} from={shared.from} onPlay={playback.start} />
       ) : (
         <div className="relative z-10 grid min-h-screen grid-rows-[1fr_auto] gap-6 px-6 py-8 lg:grid-cols-[46%_54%] lg:grid-rows-1">
           <div className="flex items-center justify-center">

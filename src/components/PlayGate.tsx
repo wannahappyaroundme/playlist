@@ -5,10 +5,11 @@ interface PlayGateProps {
   cover: string;
   colors: SongColors;
   message?: string;
+  from?: string; // 보낸 사람 이름 (선택)
   onPlay(): void;
 }
 
-export default function PlayGate({ cover, colors, message, onPlay }: PlayGateProps) {
+export default function PlayGate({ cover, colors, message, from, onPlay }: PlayGateProps) {
   return (
     <div
       className="fixed inset-0 z-30 flex flex-col items-center justify-center gap-8 px-6 text-center"
@@ -25,10 +26,19 @@ export default function PlayGate({ cover, colors, message, onPlay }: PlayGatePro
         />
       </div>
 
-      {message ? (
-        <p data-testid="gate-message" className="max-w-md text-lg text-white/85">
-          {message}
-        </p>
+      {message || from ? (
+        <div className="flex flex-col items-center gap-2">
+          {message ? (
+            <p data-testid="gate-message" className="max-w-md text-lg text-white/85">
+              {message}
+            </p>
+          ) : null}
+          {from ? (
+            <p data-testid="gate-from" className="text-sm text-white/55">
+              From. {from}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <button

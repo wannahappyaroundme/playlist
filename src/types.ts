@@ -35,6 +35,7 @@ export interface Playlist {
   id: string;
   title: string;
   message?: string;
+  from?: string; // 보낸 사람 이름 (선택)
   coverVideoId?: string;
   songIds: string[];
   createdAt: string;
@@ -43,5 +44,6 @@ export interface Playlist {
 export interface SharedPlaylist {
   title: string;
   message?: string;
+  from?: string; // 보낸 사람 이름 (선택)
   songs: { id: string; title?: string }[];
 }

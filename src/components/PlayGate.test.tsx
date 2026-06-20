@@ -24,6 +24,17 @@ describe('PlayGate', () => {
     expect(screen.queryByTestId('gate-message')).toBeNull();
   });
 
+  it('renders a "From. {from}" line when from is provided', () => {
+    render(<PlayGate cover="c.jpg" colors={colors} from="예진" onPlay={() => {}} />);
+    const fromLine = screen.getByTestId('gate-from');
+    expect(fromLine).toHaveTextContent('From. 예진');
+  });
+
+  it('does not render a from line when from is absent', () => {
+    render(<PlayGate cover="c.jpg" colors={colors} message="hi" onPlay={() => {}} />);
+    expect(screen.queryByTestId('gate-from')).toBeNull();
+  });
+
   it('renders exactly one play button', () => {
     render(<PlayGate cover="c.jpg" colors={colors} onPlay={() => {}} />);
     expect(screen.getAllByRole('button')).toHaveLength(1);

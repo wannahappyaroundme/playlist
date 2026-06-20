@@ -30,13 +30,14 @@ export interface BuildSharePayloadResult {
  * exceeds SHARE_ENCODED_MAX. Decoder already treats title as optional.
  */
 export function buildSharePayload(
-  meta: { title: string; message?: string },
+  meta: { title: string; message?: string; from?: string },
   songs: { id: string; title: string }[],
   maxEncoded: number = SHARE_ENCODED_MAX,
 ): BuildSharePayloadResult {
   const withTitles: SharedPlaylist = {
     title: meta.title,
     message: meta.message,
+    from: meta.from,
     songs: songs.map((s) => ({ id: s.id, title: s.title })),
   };
   const full = encodePlaylist(withTitles);
@@ -46,6 +47,7 @@ export function buildSharePayload(
   const slim: SharedPlaylist = {
     title: meta.title,
     message: meta.message,
+    from: meta.from,
     songs: songs.map((s) => ({ id: s.id })),
   };
   return { encoded: encodePlaylist(slim), titlesDropped: true };
@@ -67,6 +69,7 @@ function isSharedPlaylist(v: unknown): v is SharedPlaylist {
   const o = v as Record<string, unknown>;
   if (typeof o.title !== 'string') return false;
   if (o.message !== undefined && typeof o.message !== 'string') return false;
+  if (o.from !== undefined && typeof o.from !== 'string') return false;
   if (!Array.isArray(o.songs)) return false;
   return o.songs.every((s) => {
     if (typeof s !== 'object' || s === null) return false;

@@ -75,6 +75,33 @@ describe('decodePlaylist', () => {
     expect(decodePlaylist(encodePlaylist(minimal))).toEqual(minimal);
   });
 
+  it('round-trips the optional sender name (from) through encode/decode', () => {
+    const withFrom: SharedPlaylist = {
+      title: 'x',
+      message: 'hi',
+      from: '예진',
+      songs: [{ id: 'aaaaaaaaaaa' }],
+    };
+    expect(decodePlaylist(encodePlaylist(withFrom))).toEqual(withFrom);
+  });
+
+  it('buildSharePayload carries from into the encoded payload', () => {
+    const { encoded } = buildSharePayload(
+      { title: 'L', message: 'm', from: '보낸이' },
+      [{ id: 'aaaaaaaaaaa', title: 'A' }],
+    );
+    expect(decodePlaylist(encoded)?.from).toBe('보낸이');
+  });
+
+  it('rejects a payload whose from is not a string', () => {
+    const enc = (obj: unknown) =>
+      btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    expect(decodePlaylist(enc({ title: 'x', from: 123, songs: [{ id: 'aaaaaaaaaaa' }] }))).toBeNull();
+  });
+
   it('returns null for invalid base64url input', () => {
     expect(decodePlaylist('!!!not base64!!!')).toBeNull();
   });

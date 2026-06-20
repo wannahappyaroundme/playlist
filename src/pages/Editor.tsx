@@ -57,7 +57,7 @@ export default function Editor() {
   const shareBase = `${window.location.origin}${window.location.pathname}#/s/`;
 
   const { encoded } = buildSharePayload(
-    { title: playlist.title, message: playlist.message },
+    { title: playlist.title, message: playlist.message, from: playlist.from },
     songs.map((s) => ({ id: s.id, title: s.title })),
   );
   const shareUrl = `${shareBase}${encoded}`;
@@ -67,7 +67,7 @@ export default function Editor() {
   const singleShareUrl = shareSong
     ? `${shareBase}${
         buildSharePayload(
-          { title: shareSong.title, message: playlist.message },
+          { title: shareSong.title, message: playlist.message, from: playlist.from },
           [{ id: shareSong.id, title: shareSong.title }],
         ).encoded
       }`
@@ -93,9 +93,19 @@ export default function Editor() {
         <input
           id="pl-message"
           aria-label="메시지"
-          className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm outline-none"
+          placeholder="받는 사람에게 한 줄 남겨보세요"
+          className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm outline-none placeholder:text-white/30"
           value={playlist.message ?? ''}
           onChange={(e) => persist({ ...playlist, message: e.target.value })}
+        />
+        <label className="block text-xs text-white/50" htmlFor="pl-from">보낸 사람 (선택)</label>
+        <input
+          id="pl-from"
+          aria-label="보낸 사람"
+          placeholder="이름을 적으면 'From.'으로 표시돼요"
+          className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm outline-none placeholder:text-white/30"
+          value={playlist.from ?? ''}
+          onChange={(e) => persist({ ...playlist, from: e.target.value })}
         />
       </div>
 

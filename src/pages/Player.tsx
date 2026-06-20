@@ -15,13 +15,14 @@ export default function Player() {
   const { playlistId, songId } = useParams();
   const playback = usePlayback();
 
-  const { songs, message } = useMemo<{ songs: Song[]; message?: string }>(() => {
+  const { songs, message, from } = useMemo<{ songs: Song[]; message?: string; from?: string }>(() => {
     if (!playlistId) return { songs: [] };
     const pl = getPlaylist(playlistId);
     if (!pl) return { songs: [] };
     return {
       songs: pl.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s),
       message: pl.message,
+      from: pl.from,
     };
   }, [playlistId]);
 
@@ -65,6 +66,7 @@ export default function Player() {
           cover={current?.cover ?? ''}
           colors={colors}
           message={message}
+          from={from}
           onPlay={playback.start}
         />
       ) : (
