@@ -1,7 +1,11 @@
-const ID_RE = /^[A-Za-z0-9_-]{11}$/;
+export const ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+export function isVideoId(id: string | null | undefined): id is string {
+  return typeof id === 'string' && ID_RE.test(id);
+}
 
 function isValidId(id: string | null | undefined): id is string {
-  return !!id && ID_RE.test(id);
+  return isVideoId(id);
 }
 
 export function parseVideoId(input: string): string | null {

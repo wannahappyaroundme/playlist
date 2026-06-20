@@ -62,4 +62,34 @@ describe('decodePlaylist', () => {
   it('returns null for empty string', () => {
     expect(decodePlaylist('')).toBeNull();
   });
+
+  it('rejects a payload whose song id is not a valid 11-char YouTube id (Fix 15+20)', () => {
+    const enc = (obj: unknown) =>
+      btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    // too short
+    expect(decodePlaylist(enc({ title: 'x', songs: [{ id: 'abc' }] }))).toBeNull();
+    // empty string id
+    expect(decodePlaylist(enc({ title: 'x', songs: [{ id: '' }] }))).toBeNull();
+    // 12 chars (too long)
+    expect(decodePlaylist(enc({ title: 'x', songs: [{ id: 'abcdefghijkl' }] }))).toBeNull();
+    // illegal char (space) but right length
+    expect(decodePlaylist(enc({ title: 'x', songs: [{ id: 'abc 1234567' }] }))).toBeNull();
+    // one good + one bad -> whole playlist rejected (every() guard)
+    expect(
+      decodePlaylist(enc({ title: 'x', songs: [{ id: 'aaaaaaaaaaa' }, { id: 'bad' }] })),
+    ).toBeNull();
+  });
+
+  it('accepts a payload with all valid 11-char ids', () => {
+    const enc = (obj: unknown) =>
+      btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    const ok = { title: 'x', songs: [{ id: 'aaaaaaaaaaa' }, { id: 'b_c-d123456' }] };
+    expect(decodePlaylist(enc(ok))).toEqual(ok);
+  });
 });

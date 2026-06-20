@@ -1,4 +1,5 @@
 import type { SharedPlaylist } from '../types';
+import { isVideoId } from './youtube';
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let bin = '';
@@ -34,7 +35,10 @@ function isSharedPlaylist(v: unknown): v is SharedPlaylist {
   return o.songs.every((s) => {
     if (typeof s !== 'object' || s === null) return false;
     const so = s as Record<string, unknown>;
-    if (typeof so.id !== 'string') return false;
+    // Fix 15+20: shared links are untrusted input — reject ids that aren't a
+    // valid 11-char YouTube id so junk never reaches cueVideoById/thumbnailUrl
+    // (avoids 8s probe timeouts + polluted song saves).
+    if (typeof so.id !== 'string' || !isVideoId(so.id)) return false;
     if (so.title !== undefined && typeof so.title !== 'string') return false;
     return true;
   });
