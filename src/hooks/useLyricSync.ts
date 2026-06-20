@@ -31,6 +31,27 @@ export function computeActiveIndex(
 const SAMPLE_INTERVAL_MS = 250;
 // 보간값과 실제 getCurrentTime이 이만큼(초) 이상 벌어지면 즉시 재동기화(seek/드리프트 대응).
 const RESYNC_THRESHOLD_SEC = 0.4;
+// 직전 샘플 대비 이만큼(초) 이상 '뒤로' 튀면 비정상 샘플로 의심한다(라이브 스트림 이상값 등).
+const BACKWARD_GLITCH_SEC = 30;
+
+/**
+ * 샘플 시각 자체가 정상 범위인지(순수). 음수/비유한값(NaN/Infinity)은 거부한다.
+ * 라이브 스트림이 가끔 음수나 이상값을 돌려줄 때 활성 인덱스가 튀는 것을 막는다.
+ */
+export function isSaneSampleTime(time: number): boolean {
+  return Number.isFinite(time) && time >= 0;
+}
+
+/**
+ * 새 샘플 시각을 받아들일지(순수). 비정상값(음수/비유한)은 항상 거부.
+ * 직전 정상 샘플보다 BACKWARD_GLITCH_SEC 이상 '뒤로' 튀면 단발 글리치로 의심해 거부한다.
+ * (실제 seek-back이면 다음 틱에 같은 값이 다시 들어와 받아들여진다 — 단발만 무시.)
+ */
+export function acceptSampleTime(prevTime: number, sampledTime: number): boolean {
+  if (!isSaneSampleTime(sampledTime)) return false;
+  if (sampledTime < prevTime - BACKWARD_GLITCH_SEC) return false;
+  return true;
+}
 
 /**
  * 재생 중에는 rAF 루프로 250ms마다 getCurrentTime을 샘플링하고
@@ -51,6 +72,9 @@ export function useLyricSync(
   const lastSampledAtRef = useRef(0);
   const indexRef = useRef(-1);
   const primedRef = useRef(false);
+  // 비정상 샘플(음수/큰 역점프)을 연속 거부한 횟수. 같은 이상값이 2틱 연속이면 실제 seek로 보고
+  // 받아들여 영구 차단을 막는다(단발 글리치만 무시).
+  const rejectedRef = useRef(0);
 
   useEffect(() => {
     indexRef.current = activeIndex;
@@ -62,9 +86,12 @@ export function useLyricSync(
     primedRef.current = false;
 
     const prime = (now: number) => {
-      sampleRef.current = { time: getCurrentTime(), at: now };
+      const raw = getCurrentTime();
+      // 진입/재개 시 음수/이상값이면 0초로 안전하게 정렬(이상값으로 prime되는 것 방지).
+      sampleRef.current = { time: isSaneSampleTime(raw) ? raw : 0, at: now };
       lastSampledAtRef.current = now;
       primedRef.current = true;
+      rejectedRef.current = 0;
     };
 
     const tick = (now: number) => {
@@ -82,11 +109,21 @@ export function useLyricSync(
 
       const intervalElapsed = now - lastSampledAtRef.current >= SAMPLE_INTERVAL_MS;
       // 보간 추정치가 실제 재생 위치에서 크게 벗어났으면(seek/일시정지 복귀) 즉시 재샘플.
+      const raw = getCurrentTime();
       const estimated = estimateTime(sampleRef.current, now, true);
-      const drifted = Math.abs(getCurrentTime() - estimated) >= RESYNC_THRESHOLD_SEC;
+      const drifted = Math.abs(raw - estimated) >= RESYNC_THRESHOLD_SEC;
       if (intervalElapsed || drifted) {
-        sampleRef.current = { time: getCurrentTime(), at: now };
-        lastSampledAtRef.current = now;
+        // 비정상 샘플(음수/큰 역점프)은 단발이면 무시한다 — 활성 인덱스가 튀지 않게.
+        // 단, 같은 이상값이 2틱 연속이면 실제 seek로 보고 받아들인다(영구 차단 방지).
+        if (acceptSampleTime(sampleRef.current.time, raw) || rejectedRef.current >= 1) {
+          sampleRef.current = { time: isSaneSampleTime(raw) ? raw : sampleRef.current.time, at: now };
+          lastSampledAtRef.current = now;
+          rejectedRef.current = 0;
+        } else {
+          // 이 한 틱만 샘플 갱신을 건너뛴다(직전 정상 샘플 유지). 보간은 계속 진행.
+          rejectedRef.current += 1;
+          lastSampledAtRef.current = now;
+        }
       }
       const next = computeActiveIndex(sampleRef.current, now, true, lines, offsetMs);
       if (next !== indexRef.current) {

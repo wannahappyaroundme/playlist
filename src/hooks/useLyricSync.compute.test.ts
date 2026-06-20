@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeActiveIndex } from './useLyricSync';
+import { computeActiveIndex, isSaneSampleTime, acceptSampleTime } from './useLyricSync';
 import type { LyricLine } from '../types';
 
 const lines: LyricLine[] = [
@@ -48,5 +48,39 @@ describe('computeActiveIndex', () => {
     // last line = 10; t=12 is within +2s grace → still the last index, not stale
     const idx = computeActiveIndex({ time: 12, at: 1000 }, 1000, false, lines, 0);
     expect(idx).toBe(2);
+  });
+});
+
+describe('isSaneSampleTime', () => {
+  it('accepts non-negative finite times', () => {
+    expect(isSaneSampleTime(0)).toBe(true);
+    expect(isSaneSampleTime(123.4)).toBe(true);
+  });
+  it('rejects negative times', () => {
+    expect(isSaneSampleTime(-1)).toBe(false);
+    expect(isSaneSampleTime(-0.001)).toBe(false);
+  });
+  it('rejects non-finite times (NaN / Infinity)', () => {
+    expect(isSaneSampleTime(NaN)).toBe(false);
+    expect(isSaneSampleTime(Infinity)).toBe(false);
+    expect(isSaneSampleTime(-Infinity)).toBe(false);
+  });
+});
+
+describe('acceptSampleTime', () => {
+  it('accepts forward progress', () => {
+    expect(acceptSampleTime(100, 101)).toBe(true);
+  });
+  it('accepts a small backward step (pause/resume jitter, < 30s)', () => {
+    expect(acceptSampleTime(100, 95)).toBe(true);
+  });
+  it('rejects a large unexpected backward jump (> 30s, e.g. live-stream glitch)', () => {
+    expect(acceptSampleTime(200, 5)).toBe(false); // 195s back -> reject
+    expect(acceptSampleTime(100, 60)).toBe(false); // 40s back (>30) -> reject
+    expect(acceptSampleTime(100, 75)).toBe(true); // 25s back (<30) -> accept
+  });
+  it('rejects negative/odd values regardless of prev', () => {
+    expect(acceptSampleTime(0, -3)).toBe(false);
+    expect(acceptSampleTime(50, NaN)).toBe(false);
   });
 });
