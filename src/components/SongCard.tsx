@@ -11,16 +11,17 @@ interface SongCardProps {
 
 export default function SongCard({ song, active = false, onClick, onShare }: SongCardProps) {
   const synced = song.lyrics.type === 'synced';
-  // <button> 안에 <button> 중첩은 잘못된 마크업 → 공유 버튼은 래퍼 div 안의 형제로 둔다.
+  // <button> 안에 <button> 중첩은 잘못된 마크업 → 공유 버튼은 카드의 형제(인라인 flex)로 둬
+  // 배지와 겹치지 않게 나란히 배치한다.
   return (
-    <div className="relative">
+    <div className="flex items-center gap-2">
       <button
         type="button"
         data-testid="song-card"
         data-active={String(active)}
         onClick={onClick}
         className={
-          'flex w-full items-center gap-3 rounded-xl bg-white/5 p-2 text-left transition hover:bg-white/10 ' +
+          'flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-white/5 p-2 text-left transition hover:bg-white/10 ' +
           (active ? 'ring-2 ring-[var(--c3,#7755ff)] bg-white/10' : 'ring-1 ring-white/5')
         }
       >
@@ -51,7 +52,7 @@ export default function SongCard({ song, active = false, onClick, onShare }: Son
           type="button"
           aria-label="이 곡만 보내기"
           onClick={onShare}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-1 text-[11px] text-white/80 transition hover:bg-white/20"
+          className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[11px] text-white/80 transition hover:bg-white/20"
         >
           이 곡만 보내기
         </button>

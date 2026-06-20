@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { thumbnailUrl } from '../lib/youtube';
+import AppBackground from '../components/AppBackground';
 
 const EMPTY_BOX = 'aspect-square rounded-xl bg-white/5';
 
@@ -44,6 +45,7 @@ export default function Gallery() {
 
   return (
     <div className="min-h-screen px-6 py-10 text-white">
+      <AppBackground />
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-semibold tracking-tight">Yejin Playlist</h1>
         <button

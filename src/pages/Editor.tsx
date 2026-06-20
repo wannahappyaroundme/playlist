@@ -5,6 +5,7 @@ import { buildSharePayload } from '../lib/share';
 import PasteInput from '../components/PasteInput';
 import SongCard from '../components/SongCard';
 import QrShare from '../components/QrShare';
+import AppBackground from '../components/AppBackground';
 import type { Song, Playlist } from '../types';
 
 export default function Editor() {
@@ -75,6 +76,7 @@ export default function Editor() {
 
   return (
     <div className="min-h-screen px-6 py-10 text-white">
+      <AppBackground />
       <header className="mb-6 flex items-center justify-between">
         <Link to="/" className="text-sm text-white/60 hover:text-white">← 갤러리</Link>
         <Link to={`/p/${playlist.id}`} className="text-sm text-white/60 hover:text-white">재생 →</Link>
@@ -114,8 +116,8 @@ export default function Editor() {
       <ul className="mt-6 space-y-2">
         {songs.map((s, i) => (
           <li key={s.id} className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="basis-full grow min-w-0 sm:basis-0">
                 <SongCard
                   song={s}
                   onShare={() => setShareSongId((id) => (id === s.id ? null : s.id))}
