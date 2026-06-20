@@ -5,6 +5,9 @@ import {
   THUMB_FALLBACK,
   parseTitleHeuristic,
   resolveBestThumbnail,
+  fallbackCoverSrc,
+  isVideoId,
+  ID_RE,
 } from './youtube';
 
 describe('parseVideoId', () => {
@@ -250,5 +253,51 @@ describe('parseTitleHeuristic', () => {
       artist: 'TheAuthor',
       title: 'JustOneName',
     });
+  });
+});
+
+describe('isVideoId / ID_RE', () => {
+  it('ID_RE matches exactly 11 url-safe chars', () => {
+    expect(ID_RE.test('dQw4w9WgXcQ')).toBe(true);
+    expect(ID_RE.test('short')).toBe(false);
+    expect(ID_RE.test('toolongtoolong')).toBe(false);
+  });
+  it('isVideoId rejects non-strings and bad shapes', () => {
+    expect(isVideoId('dQw4w9WgXcQ')).toBe(true);
+    expect(isVideoId('b_c-d123456')).toBe(true);
+    expect(isVideoId('')).toBe(false);
+    expect(isVideoId(null)).toBe(false);
+    expect(isVideoId(undefined)).toBe(false);
+    expect(isVideoId('has space!!')).toBe(false);
+  });
+});
+
+describe('fallbackCoverSrc', () => {
+  function mkImg(src: string): HTMLImageElement {
+    const img = document.createElement('img');
+    img.src = src;
+    return img;
+  }
+
+  it('downgrades a ytimg maxres thumbnail to hqdefault on first error', () => {
+    const img = mkImg('https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg');
+    fallbackCoverSrc(img);
+    expect(img.src).toBe('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+    expect(img.dataset.coverFallback).toBe('done');
+  });
+
+  it('is a no-op on the second call (no infinite loop)', () => {
+    const img = mkImg('https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg');
+    fallbackCoverSrc(img);
+    const after = img.src;
+    fallbackCoverSrc(img);
+    expect(img.src).toBe(after);
+  });
+
+  it('leaves a non-ytimg src untouched but still flags it (one-shot)', () => {
+    const img = mkImg('https://example.com/cover.png');
+    fallbackCoverSrc(img);
+    expect(img.src).toBe('https://example.com/cover.png');
+    expect(img.dataset.coverFallback).toBe('done');
   });
 });

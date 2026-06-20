@@ -60,6 +60,23 @@ export function thumbnailUrl(videoId: string, quality: ThumbQuality = 'maxresdef
   return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
 }
 
+// Lower-quality fallback that ytimg serves for nearly every video.
+const COVER_FALLBACK_QUALITY: ThumbQuality = 'hqdefault';
+
+/**
+ * One-shot <img onError> fallback for cover thumbnails. On the first failure it
+ * downgrades a ytimg thumbnail to hqdefault (almost always present); subsequent
+ * failures are ignored (guarded by a data-fallback flag) so it never loops.
+ */
+export function fallbackCoverSrc(el: HTMLImageElement): void {
+  if (el.dataset.coverFallback === 'done') return;
+  el.dataset.coverFallback = 'done';
+  // rewrite the ytimg quality segment to hqdefault; if it's not a recognizable
+  // ytimg thumbnail, leave the src as-is (already flagged so we won't retry).
+  const m = el.src.match(/^(https:\/\/i\.ytimg\.com\/vi\/[A-Za-z0-9_-]{11}\/)[^/]+\.jpg$/);
+  if (m) el.src = `${m[1]}${COVER_FALLBACK_QUALITY}.jpg`;
+}
+
 // ytimg placeholder('찾을 수 없음')는 120x90. naturalWidth가 이 이하면 무효로 간주.
 const PLACEHOLDER_MAX_WIDTH = 120;
 

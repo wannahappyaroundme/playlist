@@ -1,4 +1,5 @@
 import type { Song } from '../types';
+import { fallbackCoverSrc } from '../lib/youtube';
 
 interface SongCardProps {
   song: Song;
@@ -20,7 +21,12 @@ export default function SongCard({ song, active = false, onClick }: SongCardProp
       }
     >
       <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
-        <img src={song.cover} alt="" className="h-full w-full object-cover" />
+        <img
+          src={song.cover}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={(e) => fallbackCoverSrc(e.currentTarget)}
+        />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white">{song.title}</p>

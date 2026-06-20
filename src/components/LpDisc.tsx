@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { fallbackCoverSrc } from '../lib/youtube';
 
 interface LpDiscProps {
   cover: string;
@@ -64,7 +65,12 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
       />
       {/* square album cover (sleeve) on the left/under */}
       <div className="absolute left-0 top-0 h-full w-[58%] rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
-        <img src={cover} alt="album cover" className="h-full w-full object-cover" />
+        <img
+          src={cover}
+          alt="album cover"
+          className="h-full w-full object-cover"
+          onError={(e) => fallbackCoverSrc(e.currentTarget)}
+        />
       </div>
       {/* LP vinyl overlapping ~42% to the right */}
       <div
@@ -83,7 +89,13 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
       >
         {/* center label = cover at 32% diameter */}
         <div className="absolute left-1/2 top-1/2 h-[32%] w-[32%] -translate-x-1/2 -translate-y-1/2 rounded-full overflow-hidden ring-2 ring-black/60">
-          <img src={cover} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+          <img
+            src={cover}
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full object-cover"
+            onError={(e) => fallbackCoverSrc(e.currentTarget)}
+          />
         </div>
         {/* spindle hole */}
         <div className="absolute left-1/2 top-1/2 h-[3%] w-[3%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-300/80" />

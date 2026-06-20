@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SongCard from './SongCard';
 import type { Song } from '../types';
@@ -59,5 +59,20 @@ describe('SongCard', () => {
     render(<SongCard song={makeSong()} onClick={onClick} />);
     await userEvent.click(screen.getByTestId('song-card'));
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('cover onError downgrades the thumbnail src once (carried fix)', () => {
+    render(
+      <SongCard
+        song={makeSong({ cover: 'https://i.ytimg.com/vi/vid12345678/maxresdefault.jpg' })}
+      />,
+    );
+    const img = screen.getByRole('img') as HTMLImageElement;
+    fireEvent.error(img);
+    expect(img.src).toBe('https://i.ytimg.com/vi/vid12345678/hqdefault.jpg');
+    expect(img.dataset.coverFallback).toBe('done');
+    // a second error does not change the src again (no loop)
+    fireEvent.error(img);
+    expect(img.src).toBe('https://i.ytimg.com/vi/vid12345678/hqdefault.jpg');
   });
 });

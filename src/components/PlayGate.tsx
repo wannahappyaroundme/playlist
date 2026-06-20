@@ -1,4 +1,5 @@
 import type { SongColors } from '../types';
+import { fallbackCoverSrc } from '../lib/youtube';
 
 interface PlayGateProps {
   cover: string;
@@ -16,7 +17,12 @@ export default function PlayGate({ cover, colors, message, onPlay }: PlayGatePro
       }}
     >
       <div className="h-36 w-36 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-        <img src={cover} alt="album cover" className="h-full w-full object-cover" />
+        <img
+          src={cover}
+          alt="album cover"
+          className="h-full w-full object-cover"
+          onError={(e) => fallbackCoverSrc(e.currentTarget)}
+        />
       </div>
 
       {message ? (
