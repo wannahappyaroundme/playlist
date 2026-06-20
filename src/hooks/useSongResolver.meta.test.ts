@@ -68,6 +68,34 @@ describe('resolveSongWith metaReady guard', () => {
     expect(deps.saveSong).not.toHaveBeenCalled();
   });
 
+  it('throws code="meta" when metaReady is false WITHOUT a probe error (timeout)', async () => {
+    const deps = makeDeps({
+      getMeta: vi.fn(async () => ({
+        video_id: 'abc12345678',
+        title: '',
+        author: '',
+        durationSec: 0,
+        metaReady: false,
+        probeErrored: false,
+      })),
+    });
+    await expect(resolveSongWith('abc12345678', deps)).rejects.toMatchObject({ code: 'meta' });
+  });
+
+  it('throws code="unplayable" when metaReady is false because the probe errored', async () => {
+    const deps = makeDeps({
+      getMeta: vi.fn(async () => ({
+        video_id: 'abc12345678',
+        title: '',
+        author: '',
+        durationSec: 0,
+        metaReady: false,
+        probeErrored: true,
+      })),
+    });
+    await expect(resolveSongWith('abc12345678', deps)).rejects.toMatchObject({ code: 'unplayable' });
+  });
+
   it('saves normally when metaReady is true', async () => {
     const deps = makeDeps();
     const song = await resolveSongWith('abc12345678', deps);

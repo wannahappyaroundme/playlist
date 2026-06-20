@@ -34,8 +34,14 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
         const song = await resolve(id);
         onAdd(song);
         addedAny = true;
-      } catch {
-        newErrors.push(`재생할 수 없는 영상이에요: ${line}`);
+      } catch (err) {
+        // 메타/타임아웃은 일시적일 수 있어 재시도 안내, 그 외(재생 불가/차단)는 단정적 안내.
+        const code = (err as { code?: unknown })?.code;
+        const msg =
+          code === 'meta'
+            ? '영상 정보를 못 읽었어요 — 잠시 후 다시 시도해 주세요'
+            : '재생할 수 없는 영상이에요';
+        newErrors.push(`${msg}: ${line}`);
       }
     }
 

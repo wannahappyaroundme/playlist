@@ -63,6 +63,23 @@ export interface ProbeMeta {
    * resolveSongWith가 저장하지 않고 throw한다. (undefined = 레거시/주입 테스트, 신뢰 처리)
    */
   metaReady?: boolean;
+  /**
+   * metaReady=false의 원인 구분. true면 프로브 onError(재생 불가/차단 영상),
+   * false/undefined면 타임아웃(메타를 못 읽음). PasteInput이 서로 다른 안내 문구로 매핑한다.
+   */
+  probeErrored?: boolean;
+}
+
+/** resolveSongWith가 던지는 에러의 원인 코드. */
+export type ResolveErrorCode = 'meta' | 'unplayable';
+
+/** code 필드를 가진 Error. PasteInput이 .code로 안내 문구를 분기한다. */
+export interface ResolveError extends Error {
+  code: ResolveErrorCode;
+}
+
+function resolveError(code: ResolveErrorCode, message: string): ResolveError {
+  return Object.assign(new Error(message), { code });
 }
 
 /**
@@ -97,7 +114,11 @@ export async function resolveSongWith(videoId: string, deps: ResolveDeps): Promi
   const meta = await deps.getMeta(videoId);
   // 빈 메타(타임아웃까지 title/duration 미수신)는 캐시에 고착시키지 않는다.
   if (meta.metaReady === false) {
-    throw new Error(`metadata unavailable for video ${videoId}`);
+    // 원인 구분: 프로브 onError면 재생 불가/차단(unplayable), 아니면 타임아웃(meta).
+    if (meta.probeErrored) {
+      throw resolveError('unplayable', `video ${videoId} is unplayable or blocked`);
+    }
+    throw resolveError('meta', `metadata unavailable for video ${videoId}`);
   }
   // 커버는 폴백 체인으로 '실제 로드되는' quality를 고른다 (maxres 부재 영상 대응).
   const cover = await (deps.resolveCover ?? resolveBestThumbnail)(videoId);
@@ -216,13 +237,15 @@ export function useSongResolver(): SongResolver {
       const dur = probe.getDuration() || 0;
       const title = data.title || '';
       // metaReady: 에러 없이 title + duration까지 받았는지(타임아웃/에러 빈-메타 식별용)
-      const metaReady = !probeErroredRef.current && !!(data.video_id && title && dur > 0);
+      const probeErrored = probeErroredRef.current;
+      const metaReady = !probeErrored && !!(data.video_id && title && dur > 0);
       return {
         video_id: data.video_id || videoId,
         title,
         author: data.author || '',
         durationSec: dur,
         metaReady,
+        probeErrored,
       };
     },
     [ensureProbe],

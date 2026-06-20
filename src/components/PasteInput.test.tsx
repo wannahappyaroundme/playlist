@@ -82,4 +82,35 @@ describe('PasteInput', () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('paste-error')).toBeInTheDocument();
   });
+
+  it('shows a "meta unreadable" message when resolve rejects with code "meta"', async () => {
+    resolveMock.mockRejectedValueOnce(Object.assign(new Error('metadata unavailable'), { code: 'meta' }));
+    const onAdd = vi.fn();
+    render(<PasteInput onAdd={onAdd} />);
+    await userEvent.type(screen.getByRole('textbox'), 'https://youtu.be/aaaaaaaaaa1');
+    await userEvent.click(screen.getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(screen.getByTestId('paste-error')).toBeInTheDocument());
+    expect(screen.getByTestId('paste-error')).toHaveTextContent('영상 정보를 못 읽었어요');
+    expect(screen.queryByText(/재생할 수 없는 영상이에요/)).not.toBeInTheDocument();
+  });
+
+  it('shows the "unplayable" message when resolve rejects with code "unplayable"', async () => {
+    resolveMock.mockRejectedValueOnce(Object.assign(new Error('blocked'), { code: 'unplayable' }));
+    const onAdd = vi.fn();
+    render(<PasteInput onAdd={onAdd} />);
+    await userEvent.type(screen.getByRole('textbox'), 'https://youtu.be/aaaaaaaaaa1');
+    await userEvent.click(screen.getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(screen.getByTestId('paste-error')).toBeInTheDocument());
+    expect(screen.getByTestId('paste-error')).toHaveTextContent('재생할 수 없는 영상이에요');
+  });
+
+  it('defaults to the "unplayable" message for an error without a code', async () => {
+    resolveMock.mockRejectedValueOnce(new Error('embed blocked'));
+    const onAdd = vi.fn();
+    render(<PasteInput onAdd={onAdd} />);
+    await userEvent.type(screen.getByRole('textbox'), 'https://youtu.be/aaaaaaaaaa1');
+    await userEvent.click(screen.getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(screen.getByTestId('paste-error')).toBeInTheDocument());
+    expect(screen.getByTestId('paste-error')).toHaveTextContent('재생할 수 없는 영상이에요');
+  });
 });
