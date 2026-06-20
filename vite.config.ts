@@ -3,10 +3,11 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // base must match the GitHub Pages project path (repo name).
-// Change to '/' for a custom domain or root deployment.
+// Override with VITE_BASE (e.g. a different repo name, or '/' for a custom
+// domain / root deployment) without editing this file. Default unchanged.
 export default defineConfig({
   plugins: [react()],
-  base: '/yejin-playlist/',
+  base: process.env.VITE_BASE ?? '/yejin-playlist/',
   test: {
     environment: 'jsdom',
     globals: true,
