@@ -125,6 +125,9 @@ export default function Editor() {
           value={playlist.message ?? ''}
           onChange={(e) => persist({ ...playlist, message: e.target.value })}
         />
+        <p className="text-xs text-white/40">
+          이 링크는 받은 사람 누구나 열 수 있어요 — 비밀 메시지는 넣지 마세요.
+        </p>
         <label className="block text-xs text-white/50" htmlFor="pl-from">보낸 사람 (선택)</label>
         <input
           id="pl-from"
@@ -214,6 +217,9 @@ export default function Editor() {
 
       <div className="mt-10">
         <h2 className="mb-3 text-sm text-white/60">공유</h2>
+        <p className="mb-3 text-xs text-white/40">
+          이 링크는 받은 사람 누구나 열 수 있어요 — 비밀 메시지는 넣지 마세요.
+        </p>
         <QrShare url={shareUrl} />
       </div>
     </div>
