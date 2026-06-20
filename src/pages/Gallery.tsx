@@ -79,10 +79,10 @@ export default function Gallery() {
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {playlists.map((p) => {
             const coverId = p.coverVideoId ?? p.songIds[0];
-            // 대표곡의 추출색으로 카드를 물들여 '플레이리스트'처럼 컬러풀하게(곡마다 다른 빛).
-            const colors = coverId ? getSong(coverId)?.colors : undefined;
-            const cardStyle = colors
-              ? { backgroundImage: cardGradient(colors.accent) }
+            // 직접 고른 색(p.color)이 있으면 우선, 없으면 대표곡 추출색으로 카드를 물들인다.
+            const baseColor = p.color ?? (coverId ? getSong(coverId)?.colors.accent : undefined);
+            const cardStyle = baseColor
+              ? { backgroundImage: cardGradient(baseColor) }
               : undefined;
             return (
             <li key={p.id}>
@@ -91,7 +91,7 @@ export default function Gallery() {
                 style={cardStyle}
                 className={
                   'block rounded-2xl p-4 backdrop-blur transition ' +
-                  (colors
+                  (baseColor
                     ? 'ring-1 ring-white/10 hover:brightness-110'
                     : 'bg-white/10 hover:bg-white/15')
                 }

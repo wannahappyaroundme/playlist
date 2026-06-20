@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { decodePlaylist } from '../lib/share';
 import { getSong, createPlaylist, savePlaylist } from '../lib/storage';
@@ -53,17 +53,31 @@ export default function SharedView() {
   }, [shared]);
 
   const current = playback.current;
+  const { getDuration } = playback;
+  const expectedDur = current?.durationSec ?? 0;
+  // 광고/로딩 동안 가사 시계를 멈추고 진짜 곡 시작 시 0초부터 맞춘다(Player와 동일).
+  const contentReady = useCallback(() => {
+    if (expectedDur <= 0) return true;
+    return Math.abs(getDuration() - expectedDur) <= Math.max(6, expectedDur * 0.05);
+  }, [getDuration, expectedDur]);
   const activeIndex = useLyricSync(
     playback.getCurrentTime,
     playback.isPlaying,
     current?.lyrics.synced ?? [],
     current?.lyrics.offsetMs ?? 0,
+    contentReady,
   );
 
   const saveToLibrary = () => {
     if (!shared) return;
     const p = createPlaylist(shared.title);
-    const withSongs = { ...p, message: shared.message, from: shared.from, songIds: songs.map((s) => s.id) };
+    const withSongs = {
+      ...p,
+      message: shared.message,
+      from: shared.from,
+      color: shared.color,
+      songIds: songs.map((s) => s.id),
+    };
     savePlaylist(withSongs);
     navigate(`/edit/${p.id}`);
   };

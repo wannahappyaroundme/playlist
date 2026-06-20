@@ -36,6 +36,7 @@ export interface Playlist {
   title: string;
   message?: string;
   from?: string; // 보낸 사람 이름 (선택)
+  color?: string; // 갤러리 카드 색상 직접 지정(hex). 없으면 대표곡 추출색 사용
   coverVideoId?: string;
   songIds: string[];
   createdAt: string;
@@ -45,5 +46,6 @@ export interface SharedPlaylist {
   title: string;
   message?: string;
   from?: string; // 보낸 사람 이름 (선택)
+  color?: string; // 카드 색상(선택)
   songs: { id: string; title?: string }[];
 }

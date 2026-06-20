@@ -8,6 +8,9 @@ import QrShare from '../components/QrShare';
 import AppBackground from '../components/AppBackground';
 import type { Song, Playlist } from '../types';
 
+// 카드 색상 프리셋(직접 고르기). 갤러리에서 cardGradient로 같은 색상의 그라데이션이 된다.
+const CARD_COLORS = ['#a855f7', '#6366f1', '#3b82f6', '#14b8a6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+
 export default function Editor() {
   const { playlistId } = useParams();
   const [playlist, setPlaylist] = useState<Playlist | null>(() =>
@@ -58,7 +61,7 @@ export default function Editor() {
   const shareBase = `${window.location.origin}${window.location.pathname}#/s/`;
 
   const { encoded } = buildSharePayload(
-    { title: playlist.title, message: playlist.message, from: playlist.from },
+    { title: playlist.title, message: playlist.message, from: playlist.from, color: playlist.color },
     songs.map((s) => ({ id: s.id, title: s.title })),
   );
   const shareUrl = `${shareBase}${encoded}`;
@@ -109,6 +112,46 @@ export default function Editor() {
           value={playlist.from ?? ''}
           onChange={(e) => persist({ ...playlist, from: e.target.value })}
         />
+        <label className="block text-xs text-white/50">카드 색상</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => persist({ ...playlist, color: undefined })}
+            className={
+              'rounded-full px-3 py-1.5 text-xs transition ' +
+              (!playlist.color
+                ? 'bg-white/25 text-white ring-1 ring-white/40'
+                : 'bg-white/10 text-white/70 hover:bg-white/20')
+            }
+          >
+            자동(곡 색)
+          </button>
+          {CARD_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`카드 색상 ${c}`}
+              onClick={() => persist({ ...playlist, color: c })}
+              style={{ backgroundColor: c }}
+              className={
+                'h-7 w-7 rounded-full transition hover:scale-110 ' +
+                (playlist.color === c
+                  ? 'ring-2 ring-white ring-offset-2 ring-offset-black/40'
+                  : 'ring-1 ring-white/20')
+              }
+            />
+          ))}
+          <label className="ml-1 inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full bg-white/10 px-3 text-xs text-white/70 hover:bg-white/20">
+            직접
+            <input
+              type="color"
+              aria-label="카드 색상 직접 선택"
+              value={playlist.color ?? '#a855f7'}
+              onChange={(e) => persist({ ...playlist, color: e.target.value })}
+              className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+          </label>
+        </div>
       </div>
 
       <PasteInput onAdd={handleAdd} />
