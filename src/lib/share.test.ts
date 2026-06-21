@@ -63,6 +63,33 @@ describe('buildSharePayload (Fix 17+18)', () => {
     expect(decoded?.songs).toHaveLength(1);
     expect(decoded?.songs[0].id).toBe('aaaaaaaaaaa');
   });
+
+  it('tooLong is false for a small playlist', () => {
+    const r = buildSharePayload({ title: 'L' }, songs);
+    expect(r.tooLong).toBe(false);
+  });
+
+  it('tooLong is true when even the id-only payload exceeds the threshold', () => {
+    // ~200 valid 11-char ids → id-only encoding is well over a tiny threshold
+    const many = Array.from({ length: 200 }, () => ({ id: 'aaaaaaaaaaa', title: 'x' }));
+    const r = buildSharePayload({ title: 'L' }, many, 100);
+    expect(r.tooLong).toBe(true);
+    // titlesDropped is also true (titles were dropped trying to fit)
+    expect(r.titlesDropped).toBe(true);
+  });
+
+  it('tooLong stays false when titles are dropped but the id-only payload fits', () => {
+    // threshold sits between the id-only length and the title-rich length:
+    // titles get dropped, but the slim (id-only) encoding still fits → not tooLong
+    const idOnly = buildSharePayload({ title: 'L' }, songs, 1).encoded; // forces slim
+    const full = buildSharePayload({ title: 'L' }, songs, 100000).encoded; // title-rich
+    const between = Math.floor((idOnly.length + full.length) / 2);
+    expect(between).toBeGreaterThan(idOnly.length);
+    expect(between).toBeLessThan(full.length);
+    const r = buildSharePayload({ title: 'L' }, songs, between);
+    expect(r.titlesDropped).toBe(true); // title-rich didn't fit
+    expect(r.tooLong).toBe(false); // but id-only does
+  });
 });
 
 describe('decodePlaylist', () => {

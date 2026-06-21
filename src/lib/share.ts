@@ -22,6 +22,8 @@ export interface BuildSharePayloadResult {
   encoded: string;
   /** true when titles were dropped (id-only) to stay under SHARE_ENCODED_MAX */
   titlesDropped: boolean;
+  /** true when even the id-only payload exceeds maxEncoded (link likely breaks in QR/messengers) */
+  tooLong: boolean;
 }
 
 /**
@@ -43,7 +45,7 @@ export function buildSharePayload(
   };
   const full = encodePlaylist(withTitles);
   if (full.length <= maxEncoded) {
-    return { encoded: full, titlesDropped: false };
+    return { encoded: full, titlesDropped: false, tooLong: false };
   }
   const slim: SharedPlaylist = {
     title: meta.title,
@@ -52,7 +54,10 @@ export function buildSharePayload(
     color: meta.color,
     songs: songs.map((s) => ({ id: s.id })),
   };
-  return { encoded: encodePlaylist(slim), titlesDropped: true };
+  const slimEncoded = encodePlaylist(slim);
+  // tooLong: even the leanest (id-only) encoding can't fit — the share link is
+  // likely to break in QR codes / messenger previews.
+  return { encoded: slimEncoded, titlesDropped: true, tooLong: slimEncoded.length > maxEncoded };
 }
 
 function base64UrlToBytes(encoded: string): Uint8Array {
