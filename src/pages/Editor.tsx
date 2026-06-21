@@ -60,6 +60,11 @@ export default function Editor() {
   }
 
   const handleAdd = (song: Song) => {
+    // 같은 링크/저장된 곡을 다시 담으면 songIds=[X,X]가 되어 React key 중복 + 같은 곡 2번 재생.
+    if (playlist.songIds.includes(song.id)) {
+      window.alert('이미 담긴 곡이에요');
+      return;
+    }
     persist({ ...playlist, songIds: [...playlist.songIds, song.id] });
   };
 

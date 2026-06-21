@@ -84,6 +84,17 @@ describe('Editor', () => {
     expect(saved.songIds).toEqual(['s0', 's1']);
   });
 
+  it('P0-3: onAdd ignores a song already in the playlist and alerts', () => {
+    // playlist already contains s0 (default fixture)
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    renderEditor();
+    savePlaylistMock.mockClear();
+    lastOnAdd!(song('s0')); // re-add the same id
+    expect(alertSpy).toHaveBeenCalledWith('이미 담긴 곡이에요');
+    expect(savePlaylistMock).not.toHaveBeenCalled(); // not persisted, no [s0,s0]
+    alertSpy.mockRestore();
+  });
+
   it('editing the title saves the playlist', async () => {
     renderEditor();
     const input = screen.getByLabelText('제목') as HTMLInputElement;

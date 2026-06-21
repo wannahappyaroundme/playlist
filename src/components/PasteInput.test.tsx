@@ -63,6 +63,20 @@ describe('PasteInput', () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(2));
   });
 
+  it('P0-3: dedupes the same id within one batch (adds once, errors the dup)', async () => {
+    resolveMock.mockResolvedValue(makeSong('dupID123456'));
+    const onAdd = vi.fn();
+    render(<PasteInput onAdd={onAdd} />);
+    const box = screen.getByRole('textbox');
+    await userEvent.click(box);
+    // same video id pasted twice
+    await userEvent.paste('https://youtu.be/dupID123456\nhttps://youtu.be/dupID123456');
+    await userEvent.click(screen.getByRole('button', { name: /add/i }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1)); // added once, not twice
+    expect(resolveMock).toHaveBeenCalledTimes(1); // 2nd skipped before resolve
+    expect(screen.getByTestId('paste-error')).toHaveTextContent('중복');
+  });
+
   it('does NOT add a song with no lyrics and asks for a different link', async () => {
     resolveMock.mockResolvedValue(makeSong('abcDEF12345', 'none'));
     const onAdd = vi.fn();

@@ -24,11 +24,17 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
     setBusy(true);
     const newErrors: string[] = [];
     let addedAny = false;
+    // 이번 붙여넣기 배치 안에서 이미 추가한 id를 추적해 같은 링크 중복을 거른다.
+    const seen = new Set<string>();
 
     for (const line of lines) {
       const id = parseVideoId(line);
       if (!id) {
         newErrors.push(`링크를 인식하지 못했어요: ${line}`);
+        continue;
+      }
+      if (seen.has(id)) {
+        newErrors.push(`이미 추가한 곡이에요(중복): ${line}`);
         continue;
       }
       try {
@@ -39,6 +45,7 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
           continue;
         }
         onAdd(song);
+        seen.add(id); // 같은 배치에서 같은 링크가 또 나오면 거른다
         addedAny = true;
       } catch (err) {
         // 메타/타임아웃은 일시적일 수 있어 재시도 안내, 그 외(재생 불가/차단)는 단정적 안내.
