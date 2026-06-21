@@ -215,11 +215,11 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
         healedIndexRef.current = idx;
         const healed: Song = { ...cur, durationSec: live };
         // 인메모리 큐 갱신(불변 복사로 리렌더 유발 — 광고 게이트가 새 길이를 즉시 사용)
+        // 순수 updater: queueRef는 [queue] useEffect가 동기화한다(StrictMode 이중 호출 안전).
         setQueue((prev) => {
           if (prev[idx]?.id !== cur.id) return prev; // 곡이 이미 바뀌었으면 무시
           const copy = prev.slice();
           copy[idx] = healed;
-          queueRef.current = copy;
           return copy;
         });
         // 영속 풀도 갱신 — quota 초과여도 진행도 인터벌이 죽지 않게 삼킨다(인메모리 큐는 이미 갱신됨).
@@ -248,11 +248,9 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   // SharedView가 첫 곡 재생을 막지 않으면서 나머지 곡을 백그라운드로 받아 이어붙일 때 쓴다.
   const appendToQueue = useCallback((songs: Song[]) => {
     if (songs.length === 0) return;
-    setQueue((prev) => {
-      const next = [...prev, ...songs];
-      queueRef.current = next; // onStateChange 콜백이 즉시 새 큐 길이를 보게 한다
-      return next;
-    });
+    // 순수 updater: queueRef는 [queue] useEffect가 동기화한다(StrictMode 이중 호출 안전).
+    // 새 길이를 동기적으로 알아야 하면 prev.length + songs.length로 로컬 계산한다.
+    setQueue((prev) => [...prev, ...songs]);
   }, []);
 
   // 첫 사용자 제스처: 게이트를 열고 현재 곡을 재생한다.
