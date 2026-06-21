@@ -192,7 +192,7 @@ function repairPlaylist(p: unknown): Playlist | null {
   if (!Array.isArray(p.songIds)) return null;
   const songIds = p.songIds.filter((s): s is string => typeof s === 'string');
   // id가 없으면 importAll의 재슬러그 단계에서 채워지므로 비워둔 채 통과시킨다.
-  return { ...(p as Playlist), id, title, songIds };
+  return { ...(p as unknown as Playlist), id, title, songIds };
 }
 
 function validateBackup(data: unknown): BackupPayload {

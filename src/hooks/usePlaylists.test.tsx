@@ -40,7 +40,7 @@ describe('usePlaylists', () => {
     (storage.loadPlaylists as any).mockReturnValueOnce([]).mockReturnValue([created]);
     (storage.createPlaylist as any).mockReturnValue(created);
     const { result } = renderHook(() => usePlaylists());
-    let returned: Playlist | undefined;
+    let returned: Playlist | null | undefined;
     act(() => { returned = result.current.create('My List'); });
     expect(storage.createPlaylist).toHaveBeenCalledWith('My List');
     expect(storage.savePlaylist).toHaveBeenCalledWith(created);

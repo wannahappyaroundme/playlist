@@ -27,8 +27,6 @@ export default function SharedView() {
     [encoded],
   );
 
-  // 보관함 저장용으로 지금까지 큐에 들어간 곡들을 추적한다(첫 곡 + 백그라운드로 이어붙인 곡).
-  const [songs, setSongs] = useState<Song[]>([]);
   // 첫 곡을 확보하기 전까지만 막는다(전체 대기 → 첫 곡 대기로 축소).
   const [loadingFirst, setLoadingFirst] = useState(true);
   // 백그라운드 진행 표시: 큐에 들어간 곡 수 / 전체 곡 수.
@@ -56,7 +54,6 @@ export default function SharedView() {
     const total = entries.length;
     setLoadingFirst(true);
     setReadyCount(0);
-    setSongs([]);
     setNoneResolved(false);
 
     (async () => {
@@ -87,7 +84,6 @@ export default function SharedView() {
       }
 
       playback.playQueue([first], 0);
-      setSongs([first]);
       setLoadingFirst(false);
 
       // 2) 첫 곡 다음(원래 순서)부터 나머지를 동시성 한도로 해석하되, 순서대로 큐에 이어붙인다.
@@ -104,7 +100,6 @@ export default function SharedView() {
           const song = results[nextAppendIdx];
           if (song) {
             playback.appendToQueue([song]);
-            setSongs((prev) => [...prev, song]);
           }
           setReadyCount((c) => c + 1);
           nextAppendIdx += 1;

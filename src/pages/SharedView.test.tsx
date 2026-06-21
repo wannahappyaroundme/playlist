@@ -142,7 +142,8 @@ describe('SharedView', () => {
     renderAt('GOOD');
     await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
     await userEvent.click(screen.getByRole('button', { name: /내 보관함에 저장/ }));
-    const saved = savePlaylistMock.mock.calls.at(-1)![0] as Playlist;
+    const saveCalls = savePlaylistMock.mock.calls;
+    const saved = saveCalls[saveCalls.length - 1][0] as Playlist;
     // ALL three gifted ids are persisted (unresolved ones recover later via 다시 찾기).
     expect(saved.songIds).toEqual(['s0', 's1', 's2']);
     expect(navigateMock).toHaveBeenCalledWith('/edit/newpl');
