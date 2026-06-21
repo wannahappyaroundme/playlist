@@ -5,6 +5,7 @@ import {
   PLAYLISTS_KEY,
   SONGS_KEY,
   StorageWriteError,
+  collectReferencedIds,
   createPlaylist,
   deletePlaylist,
   exportAll,
@@ -14,8 +15,10 @@ import {
   loadPlaylists,
   loadSongs,
   makeSlug,
+  removeSong,
   savePlaylist,
   saveSong,
+  sweepOrphans,
 } from './storage';
 
 // --- shared fixtures (reused by later tasks in this file) ---
@@ -232,7 +235,9 @@ describe('backup export / import', () => {
       playlists: [],
     });
     const counts = importAll(json); // merge defaults to true
-    expect(counts.songs).toBe(2);
+    // NET-new count: only new00000001 is genuinely new (over0000001 overwrote an
+    // existing entry), so the gallery alert reports 1 added, not 2.
+    expect(counts.songs).toBe(1);
     expect(getSong('keep0000001')?.title).toBe('Existing Keep'); // untouched
     expect(getSong('over0000001')?.title).toBe('New Value'); // overwritten
     expect(getSong('new00000001')?.title).toBe('Fresh'); // added
@@ -276,5 +281,97 @@ describe('backup export / import', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it('importAll merge reports NET-new song count (overwrites count as 0)', () => {
+    saveSong(makeSong({ id: 'exist000001' }));
+    const json = JSON.stringify({
+      version: 1,
+      songs: {
+        exist000001: makeSong({ id: 'exist000001', title: 'Overwrite' }), // already present
+        fresh000001: makeSong({ id: 'fresh000001' }), // genuinely new
+      },
+      playlists: [],
+    });
+    const counts = importAll(json);
+    expect(counts.songs).toBe(1); // only fresh000001 is net-new
+    expect(Object.keys(loadSongs())).toHaveLength(2);
+  });
+
+  it('importAll drops a malformed playlist and keeps a valid one', () => {
+    const valid = makePlaylist({ id: 'ok-1111', title: 'Valid', songIds: ['abc12345678'] });
+    const json = JSON.stringify({
+      version: 1,
+      songs: {},
+      playlists: [
+        valid,
+        { id: 'bad-1', title: 'No SongIds' }, // missing songIds → dropped
+        { title: 'No Id Either', songIds: 'nope' }, // songIds not array → dropped
+      ],
+    });
+    const counts = importAll(json);
+    expect(counts.playlists).toBe(1);
+    const all = loadPlaylists();
+    expect(all).toHaveLength(1);
+    expect(all[0].title).toBe('Valid');
+    expect(all[0].songIds).toEqual(['abc12345678']);
+  });
+
+  it('importAll repairs a playlist with non-string songIds entries', () => {
+    const json = JSON.stringify({
+      version: 1,
+      songs: {},
+      playlists: [{ id: 'mix-1', title: 'Mixed', songIds: ['good0000001', 42, null, 'good0000002'] }],
+    });
+    importAll(json);
+    const all = loadPlaylists();
+    expect(all[0].songIds).toEqual(['good0000001', 'good0000002']);
+  });
+});
+
+describe('song pool GC', () => {
+  it('removeSong deletes a pool entry; unknown id is a no-op', () => {
+    saveSong(makeSong({ id: 'keepme00001' }));
+    saveSong(makeSong({ id: 'dropme00001' }));
+    removeSong('dropme00001');
+    expect(getSong('dropme00001')).toBeUndefined();
+    expect(getSong('keepme00001')).toBeDefined();
+    // no-op on missing id (and no throw)
+    removeSong('nothere0001');
+    expect(Object.keys(loadSongs())).toHaveLength(1);
+  });
+
+  it('collectReferencedIds unions songIds + coverVideoId across playlists', () => {
+    savePlaylist(makePlaylist({ id: 'p1', songIds: ['s1', 's2'], coverVideoId: 'cov1' }));
+    savePlaylist(makePlaylist({ id: 'p2', songIds: ['s2', 's3'] }));
+    const ids = collectReferencedIds();
+    expect(ids).toEqual(new Set(['s1', 's2', 's3', 'cov1']));
+  });
+
+  it('sweepOrphans removes unreferenced pool songs and keeps referenced ones', () => {
+    // referenced by a playlist
+    saveSong(makeSong({ id: 'ref0000001' }));
+    saveSong(makeSong({ id: 'cov0000001' })); // referenced via coverVideoId
+    // orphans (no playlist references them)
+    saveSong(makeSong({ id: 'orphan00001' }));
+    saveSong(makeSong({ id: 'orphan00002' }));
+    savePlaylist(makePlaylist({ id: 'p1', songIds: ['ref0000001'], coverVideoId: 'cov0000001' }));
+
+    const removed = sweepOrphans();
+    expect(removed).toBe(2);
+    expect(getSong('ref0000001')).toBeDefined();
+    expect(getSong('cov0000001')).toBeDefined();
+    expect(getSong('orphan00001')).toBeUndefined();
+    expect(getSong('orphan00002')).toBeUndefined();
+  });
+
+  it('sweepOrphans returns 0 and writes nothing when all songs are referenced', () => {
+    saveSong(makeSong({ id: 'ref0000001' }));
+    savePlaylist(makePlaylist({ id: 'p1', songIds: ['ref0000001'] }));
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const removed = sweepOrphans();
+    expect(removed).toBe(0);
+    expect(setSpy).not.toHaveBeenCalled(); // no needless write
+    setSpy.mockRestore();
   });
 });
