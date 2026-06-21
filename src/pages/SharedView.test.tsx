@@ -10,10 +10,12 @@ vi.mock('../lib/share', () => ({ decodePlaylist: (...a: any[]) => decodeMock(...
 const getSongMock = vi.fn();
 const createPlaylistMock = vi.fn();
 const savePlaylistMock = vi.fn();
+const { StorageWriteErrorMock } = vi.hoisted(() => ({ StorageWriteErrorMock: class extends Error {} }));
 vi.mock('../lib/storage', () => ({
   getSong: (...a: any[]) => getSongMock(...a),
   createPlaylist: (...a: any[]) => createPlaylistMock(...a),
   savePlaylist: (...a: any[]) => savePlaylistMock(...a),
+  StorageWriteError: StorageWriteErrorMock,
 }));
 
 const resolveMock = vi.fn();
@@ -124,5 +126,70 @@ describe('SharedView', () => {
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.songIds).toEqual(['s0']);
     expect(navigateMock).toHaveBeenCalledWith('/edit/newpl');
+  });
+
+  it('P0-1: saves the FULL gifted set even when pressed mid-load (not the partial pool)', async () => {
+    // 3-song gift, but resolve is slow so only the first is in `songs` when we save.
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }, { id: 's1' }, { id: 's2' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockImplementation((id: string) => (id === 's0' ? song('s0') : undefined));
+    // s1/s2 never settle within the test → they are NOT in the loaded `songs` state.
+    resolveMock.mockImplementation((id: string) =>
+      id === 's0' ? Promise.resolve(song('s0')) : new Promise<Song>(() => {}),
+    );
+    const created: Playlist = { id: 'newpl', title: 'Gift', songIds: [], createdAt: '2026-06-20' };
+    createPlaylistMock.mockReturnValue(created);
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: /내 보관함에 저장/ }));
+    const saved = savePlaylistMock.mock.calls.at(-1)![0] as Playlist;
+    // ALL three gifted ids are persisted (unresolved ones recover later via 다시 찾기).
+    expect(saved.songIds).toEqual(['s0', 's1', 's2']);
+    expect(navigateMock).toHaveBeenCalledWith('/edit/newpl');
+  });
+
+  it('P0-2: when the FIRST entry fails, plays the first successfully-resolved song', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 'bad' }, { id: 's1' }, { id: 's2' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockReturnValue(undefined);
+    resolveMock.mockImplementation(async (id: string) => {
+      if (id === 'bad') throw new Error('deleted');
+      return song(id);
+    });
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    // first cued song is s1 (bad was skipped), not an empty queue
+    expect(playQueueMock.mock.calls[0][0].map((s: Song) => s.id)).toEqual(['s1']);
+    await waitFor(() => {
+      const appended = appendToQueueMock.mock.calls.flatMap((c) => c[0].map((s: Song) => s.id));
+      expect(appended).toEqual(['s2']);
+    });
+  });
+
+  it('P0-2: when NONE resolve, shows a clear message instead of hanging', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 'bad1' }, { id: 'bad2' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockReturnValue(undefined);
+    resolveMock.mockRejectedValue(new Error('all gone'));
+    renderAt('GOOD');
+    await waitFor(() => expect(screen.getByText('곡을 불러올 수 없어요')).toBeInTheDocument());
+    expect(playQueueMock).not.toHaveBeenCalled();
+    expect(screen.queryByText('불러오는 중…')).toBeNull();
+  });
+
+  it('P0-4: a quota error on save alerts and does NOT navigate', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockImplementation((id: string) => song(id));
+    resolveMock.mockImplementation(async (id: string) => song(id));
+    createPlaylistMock.mockReturnValue({ id: 'newpl', title: 'Gift', songIds: [], createdAt: 'x' });
+    savePlaylistMock.mockImplementation(() => { throw new StorageWriteErrorMock('full'); });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: /내 보관함에 저장/ }));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('저장 공간이 가득'));
+    expect(navigateMock).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 });
