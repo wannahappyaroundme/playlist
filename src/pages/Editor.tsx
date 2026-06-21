@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPlaylist, savePlaylist, getSong, StorageWriteError } from '../lib/storage';
 import { buildSharePayload } from '../lib/share';
+import { filterSongs, reorder } from '../lib/editor';
 import { useSongResolver } from '../hooks/useSongResolver';
 import PasteInput from '../components/PasteInput';
 import SongCard from '../components/SongCard';
@@ -11,6 +12,9 @@ import type { Song, Playlist } from '../types';
 
 // 카드 색상 프리셋(직접 고르기). 갤러리에서 cardGradient로 같은 색상의 그라데이션이 된다.
 const CARD_COLORS = ['#a855f7', '#6366f1', '#3b82f6', '#14b8a6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+
+// 곡이 이보다 많을 때만 검색창을 노출(작은 목록은 깔끔하게 유지).
+const SEARCH_MIN_SONGS = 5;
 
 export default function Editor() {
   const { playlistId } = useParams();
@@ -24,6 +28,10 @@ export default function Editor() {
   const [poolVersion, setPoolVersion] = useState(0);
   // 현재 '다시 찾기' 진행 중인 곡 id(버튼 비활성/aria-busy용).
   const [reResolvingId, setReResolvingId] = useState<string | null>(null);
+  // 검색어(제목/아티스트 부분 일치 필터). 비어 있으면 전체 목록 + 순서 변경 가능.
+  const [query, setQuery] = useState('');
+  // 드래그 재정렬 중 잡고 있는 곡 id(드래그 시작점). null이면 드래그 안 함.
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const songs = useMemo<Song[]>(
     () => (playlist ? playlist.songIds.map((id) => getSong(id)).filter((s): s is Song => !!s) : []),
@@ -74,16 +82,29 @@ export default function Editor() {
     persist({ ...playlist, songIds: [...playlist.songIds, song.id] });
   };
 
-  const move = (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (target < 0 || target >= playlist.songIds.length) return;
-    const ids = [...playlist.songIds];
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+  // 순서/삭제는 모두 songId 기준으로 동작한다 — 검색 필터로 화면 인덱스가 전체 목록
+  // 인덱스와 어긋날 때도(off-by-index) 항상 올바른 곡을 대상으로 하기 위함.
+  const move = (songId: string, dir: -1 | 1) => {
+    const index = playlist.songIds.indexOf(songId);
+    if (index < 0) return;
+    const ids = reorder(playlist.songIds, index, index + dir);
+    if (ids === playlist.songIds) return; // 범위 밖이면 그대로
     persist({ ...playlist, songIds: ids });
   };
 
-  const removeAt = (index: number) => {
-    const ids = playlist.songIds.filter((_, i) => i !== index);
+  const removeById = (songId: string) => {
+    const ids = playlist.songIds.filter((id) => id !== songId);
+    persist({ ...playlist, songIds: ids });
+  };
+
+  // 드래그 재정렬: 잡은 곡(dragId)을 drop 대상(targetId) 위치로 옮긴다.
+  const handleDrop = (targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    const from = playlist.songIds.indexOf(dragId);
+    const to = playlist.songIds.indexOf(targetId);
+    setDragId(null);
+    const ids = reorder(playlist.songIds, from, to);
+    if (ids === playlist.songIds) return;
     persist({ ...playlist, songIds: ids });
   };
 
@@ -113,6 +134,11 @@ export default function Editor() {
     songs.map((s) => ({ id: s.id, title: s.title })),
   );
   const shareUrl = `${shareBase}${encoded}`;
+
+  // 검색 필터 결과(화면에 보일 목록). 검색 중에는 순서 변경(↑/↓·드래그)을 끈다.
+  const filtering = query.trim() !== '';
+  const displayed = filterSongs(songs, query);
+  const showSearch = songs.length > SEARCH_MIN_SONGS;
 
   // 단일 곡 공유 URL: 같은 #/s/ 포맷, songs 배열에 곡 하나만.
   const shareSong = shareSongId ? songs.find((s) => s.id === shareSongId) ?? null : null;
@@ -207,14 +233,52 @@ export default function Editor() {
 
       <PasteInput onAdd={handleAdd} />
 
+      {showSearch ? (
+        <div className="mt-6 space-y-1">
+          <input
+            type="search"
+            aria-label="곡 검색"
+            placeholder="제목·가수로 검색"
+            className="w-full rounded-xl bg-white/10 px-4 py-2.5 text-sm outline-none placeholder:text-white/30"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {filtering ? (
+            <div className="flex items-center justify-between px-1 text-[11px] text-white/40">
+              <span>검색 중에는 순서 변경이 꺼져요</span>
+              <span>{songs.length}곡 중 {displayed.length}곡</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <ul className="mt-6 space-y-2">
-        {songs.map((s, i) => {
+        {displayed.map((s) => {
           // 갤러리에 실제로 보일 대표 표지(고른 표지 우선, 없으면 첫 곡).
           const effectiveCover = playlist.coverVideoId ?? playlist.songIds[0];
           const isCover = s.id === effectiveCover;
+          // 드래그·순서 변경은 검색 중이 아닐 때만(필터로 인덱스가 어긋나는 혼란 방지).
+          const canReorder = !filtering;
           return (
-          <li key={s.id} className="space-y-2">
+          <li
+            key={s.id}
+            className={'space-y-2 ' + (dragId === s.id ? 'opacity-50' : '')}
+            draggable={canReorder}
+            onDragStart={canReorder ? () => setDragId(s.id) : undefined}
+            onDragOver={canReorder ? (e) => e.preventDefault() : undefined}
+            onDrop={canReorder ? () => handleDrop(s.id) : undefined}
+            onDragEnd={canReorder ? () => setDragId(null) : undefined}
+          >
             <div className="flex flex-wrap items-center gap-2">
+              {canReorder ? (
+                <span
+                  aria-hidden="true"
+                  title="드래그해서 순서 변경"
+                  className="cursor-grab select-none px-1 text-white/30 active:cursor-grabbing"
+                >
+                  ⠿
+                </span>
+              ) : null}
               <div className="basis-full grow min-w-0 sm:basis-0">
                 <SongCard
                   song={s}
@@ -245,9 +309,13 @@ export default function Editor() {
               >
                 {reResolvingId === s.id ? '찾는 중…' : '다시 찾기'}
               </button>
-              <button type="button" aria-label="위로" onClick={() => move(i, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
-              <button type="button" aria-label="아래로" onClick={() => move(i, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
-              <button type="button" aria-label="삭제" onClick={() => removeAt(i)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
+              {canReorder ? (
+                <>
+                  <button type="button" aria-label="위로" onClick={() => move(s.id, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
+                  <button type="button" aria-label="아래로" onClick={() => move(s.id, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
+                </>
+              ) : null}
+              <button type="button" aria-label="삭제" onClick={() => removeById(s.id)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
             </div>
             {shareSongId === s.id ? (
               <div data-testid="single-share" className="rounded-2xl bg-white/5 p-4">

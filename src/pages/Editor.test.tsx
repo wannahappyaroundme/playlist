@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import type { Song, Playlist } from '../types';
@@ -14,7 +14,11 @@ vi.mock('../lib/storage', () => ({
   getSong: (...a: any[]) => getSongMock(...a),
   StorageWriteError: StorageWriteErrorMock,
 }));
-const buildSharePayloadMock = vi.fn((..._a: any[]) => ({ encoded: 'ENC', titlesDropped: false }));
+const buildSharePayloadMock = vi.fn((..._a: any[]) => ({
+  encoded: 'ENC',
+  titlesDropped: false,
+  tooLong: false,
+}));
 vi.mock('../lib/share', () => ({
   buildSharePayload: (...a: any[]) => buildSharePayloadMock(...a),
 }));
@@ -66,6 +70,9 @@ describe('Editor', () => {
     lastOnAdd = null;
     getPlaylistMock.mockReturnValue(pl(['s0']));
     getSongMock.mockImplementation((id: string) => song(id));
+    // clearAllMocks only clears call history (not implementations) — restore the
+    // default share payload so per-test mockReturnValue overrides don't leak.
+    buildSharePayloadMock.mockReturnValue({ encoded: 'ENC', titlesDropped: false, tooLong: false });
   });
 
   it('renders existing song cards and the paste input', () => {
@@ -207,5 +214,94 @@ describe('Editor', () => {
     );
     expect(singleCall).toBeTruthy();
     expect((singleCall as any[])[1]).toEqual([{ id: 's1', title: 'song-s1' }]);
+  });
+
+  // ---- Item 1: search / filter ----
+  const sixIds = ['s0', 's1', 's2', 's3', 's4', 's5'];
+
+  it('search box is hidden for small playlists (<= 5 songs)', () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    renderEditor();
+    expect(screen.queryByLabelText('곡 검색')).toBeNull();
+  });
+
+  it('search box appears once there are more than 5 songs', () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    renderEditor();
+    expect(screen.getByLabelText('곡 검색')).toBeInTheDocument();
+  });
+
+  it('typing a query filters the shown song cards and shows the n곡 중 m곡 count', async () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    renderEditor();
+    const box = screen.getByLabelText('곡 검색');
+    await userEvent.type(box, 's3');
+    // only the matching card is rendered
+    expect(screen.getByText('song-s3')).toBeInTheDocument();
+    expect(screen.queryByText('song-s0')).toBeNull();
+    // count + reorder-off hint
+    expect(screen.getByText('6곡 중 1곡')).toBeInTheDocument();
+    expect(screen.getByText('검색 중에는 순서 변경이 꺼져요')).toBeInTheDocument();
+  });
+
+  it('reorder controls (↑/↓) are hidden while filtering', async () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    renderEditor();
+    expect(screen.getAllByRole('button', { name: '위로' }).length).toBe(6);
+    await userEvent.type(screen.getByLabelText('곡 검색'), 's3');
+    expect(screen.queryByRole('button', { name: '위로' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '아래로' })).toBeNull();
+  });
+
+  it('deleting while filtering removes the correct song by id (no off-by-index)', async () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    renderEditor();
+    await userEvent.type(screen.getByLabelText('곡 검색'), 's4');
+    // only one delete button is shown (for the filtered s4); it must remove s4, not index-4 of filtered view
+    const dels = screen.getAllByRole('button', { name: '삭제' });
+    expect(dels).toHaveLength(1);
+    await userEvent.click(dels[0]);
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.songIds).toEqual(['s0', 's1', 's2', 's3', 's5']); // s4 gone, rest intact
+  });
+
+  it('clearing the query restores the full list and reorder controls', async () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    renderEditor();
+    const box = screen.getByLabelText('곡 검색');
+    await userEvent.type(box, 's3');
+    expect(screen.queryByText('song-s0')).toBeNull();
+    await userEvent.clear(box);
+    expect(screen.getByText('song-s0')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '위로' }).length).toBe(6);
+  });
+
+  // ---- Item 2: drag reorder ----
+  // NOTE: jsdom cannot simulate a real pointer drag (DataTransfer, drag image,
+  // touch). We exercise the React onDragStart/onDrop wiring via fireEvent here;
+  // the actual drag *interaction* is manual-verified in a real browser. The
+  // reorder math itself is covered exhaustively in src/lib/editor.test.ts.
+  it('dragging a row onto another reorders songIds via persist (onDragStart→onDrop)', () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    const { container } = renderEditor();
+    const rows = container.querySelectorAll('li[draggable="true"]');
+    expect(rows).toHaveLength(3);
+    // drag s0 (row 0) onto s2 (row 2); fireEvent wraps each in act() so the
+    // dragId state set by dragStart is flushed before drop reads it.
+    fireEvent.dragStart(rows[0]);
+    fireEvent.dragOver(rows[2]);
+    fireEvent.drop(rows[2]);
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.songIds).toEqual(['s1', 's2', 's0']); // s0 moved to s2's slot
+  });
+
+  it('rows are not draggable while filtering', async () => {
+    getPlaylistMock.mockReturnValue(pl(sixIds));
+    const { container } = renderEditor();
+    expect(container.querySelectorAll('li[draggable="true"]').length).toBe(6);
+    await userEvent.type(screen.getByLabelText('곡 검색'), 's3');
+    expect(container.querySelectorAll('li[draggable="true"]').length).toBe(0);
   });
 });
