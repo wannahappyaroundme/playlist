@@ -15,11 +15,11 @@ export default function LegalLayout({ title, updated, children }: LegalLayoutPro
   return (
     <div className="min-h-screen px-6 py-10 text-white">
       <AppBackground />
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-xl sm:max-w-2xl">
         <Link to="/" className="text-sm text-white/60 hover:text-white">← 홈으로</Link>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
         <p className="mt-1 text-xs text-white/50">시행일 {updated}</p>
-        <div className="mt-8 space-y-6 text-sm leading-relaxed text-white/85">{children}</div>
+        <div className="mt-8 space-y-6 text-sm leading-relaxed text-white/90">{children}</div>
         <p className="mt-12 text-xs text-white/40">Yejin Playlist · 개인·비영리 프로젝트</p>
       </div>
     </div>
@@ -30,7 +30,7 @@ export default function LegalLayout({ title, updated, children }: LegalLayoutPro
 export function LegalSection({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-base font-semibold text-white">{heading}</h2>
+      <h2 className="text-lg font-semibold text-white">{heading}</h2>
       <div className="space-y-2 text-white/80">{children}</div>
     </section>
   );

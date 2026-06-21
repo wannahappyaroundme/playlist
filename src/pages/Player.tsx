@@ -92,12 +92,14 @@ export default function Player() {
           onPlay={playback.start}
         />
       ) : (
-        <div className="relative z-10 grid h-[100dvh] grid-rows-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-4 px-6 py-6 lg:grid-cols-[46%_54%] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-6 lg:px-10 lg:py-8">
+        <div className="relative z-10 grid h-[100dvh] grid-rows-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto] gap-4 px-6 py-6 lg:grid-cols-[46%_54%] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-6 lg:px-10 lg:py-8">
           <div className="flex min-h-0 items-center justify-center">
             <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} />
           </div>
           <div className="flex min-h-0 items-stretch justify-center">
-            <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} accent={colors.accent} />
+            <div className="h-full w-full lg:max-w-2xl">
+              <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} accent={colors.accent} />
+            </div>
           </div>
           <div className="lg:col-span-2">
             <Controls

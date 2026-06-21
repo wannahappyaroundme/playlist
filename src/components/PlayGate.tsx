@@ -17,7 +17,7 @@ export default function PlayGate({ cover, colors, message, from, onPlay }: PlayG
         backgroundImage: `radial-gradient(120% 100% at 50% 30%, ${colors.gradientFrom} 0%, ${colors.gradientTo} 80%)`,
       }}
     >
-      <div className="h-36 w-36 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+      <div className="h-32 w-32 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 sm:h-40 sm:w-40 lg:h-48 lg:w-48">
         <img
           src={cover}
           alt="album cover"
@@ -34,7 +34,7 @@ export default function PlayGate({ cover, colors, message, from, onPlay }: PlayG
             </p>
           ) : null}
           {from ? (
-            <p data-testid="gate-from" className="text-sm text-white/55">
+            <p data-testid="gate-from" className="text-base text-white/75">
               From. {from}
             </p>
           ) : null}

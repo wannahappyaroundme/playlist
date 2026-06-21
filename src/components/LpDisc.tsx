@@ -62,7 +62,7 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
   // ~63.3%, leaving the cover's left ~58% (of its own width) visible as the sleeve.
   return (
     <div
-      className="relative w-full max-w-[min(92vmin,720px)] mx-auto select-none"
+      className="relative w-full max-w-[min(84vw,420px)] lg:max-w-[min(82vmin,680px)] mx-auto select-none"
       style={{
         // 2 - overlap as an aspect-ratio width:height (height == D == one piece)
         aspectRatio: `calc(2 - var(--lp-overlap, 42%) / 100%) / 1`,

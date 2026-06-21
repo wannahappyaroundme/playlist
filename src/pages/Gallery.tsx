@@ -195,9 +195,9 @@ export default function Gallery() {
       ) : null}
 
       {playlists.length === 0 ? (
-        <div className="mt-28 text-center text-white/75">
-          <p className="text-3xl font-semibold text-white sm:text-4xl">아직 플레이리스트가 없어요.</p>
-          <p className="mt-5 text-lg sm:text-xl">위의 “새 플레이리스트” 버튼으로 시작하세요.</p>
+        <div className="mt-16 text-center text-white/75 sm:mt-28">
+          <p className="text-2xl font-semibold text-white sm:text-3xl">아직 플레이리스트가 없어요.</p>
+          <p className="mt-4 text-base font-medium sm:text-lg">위의 “새 플레이리스트” 버튼으로 시작하세요.</p>
         </div>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -238,13 +238,13 @@ export default function Gallery() {
                   ) : (
                     <p className="truncate text-sm font-medium drop-shadow">{p.title}</p>
                   )}
-                  <p className="shrink-0 text-xs text-white/80">{p.songIds.length}곡</p>
+                  <p className="shrink-0 text-xs text-white drop-shadow">{p.songIds.length}곡</p>
                 </div>
                 {/* 액션: 편집 / 이름변경 / 복제 / 삭제 */}
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <div className="mt-2 flex flex-wrap items-center gap-1">
                   <Link
                     to={`/edit/${p.id}`}
-                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                    className="rounded-lg bg-black/25 px-1.5 py-0.5 text-xs text-white/90 transition hover:bg-black/45"
                   >
                     편집
                   </Link>
@@ -252,7 +252,7 @@ export default function Gallery() {
                     type="button"
                     aria-label={`${p.title} 이름변경`}
                     onClick={() => startRename(p.id, p.title)}
-                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                    className="rounded-lg bg-black/25 px-1.5 py-0.5 text-xs text-white/90 transition hover:bg-black/45"
                   >
                     이름변경
                   </button>
@@ -260,7 +260,7 @@ export default function Gallery() {
                     type="button"
                     aria-label={`${p.title} 복제`}
                     onClick={() => handleDuplicate(p.id)}
-                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                    className="rounded-lg bg-black/25 px-1.5 py-0.5 text-xs text-white/90 transition hover:bg-black/45"
                   >
                     복제
                   </button>
@@ -268,7 +268,7 @@ export default function Gallery() {
                     type="button"
                     aria-label={`${p.title} 삭제`}
                     onClick={() => handleDelete(p.id, p.title)}
-                    className="ml-auto rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-red-500/55 hover:text-white"
+                    className="ml-auto rounded-lg bg-red-500/25 px-1.5 py-0.5 text-xs text-red-100 transition hover:bg-red-500/50 hover:text-white"
                   >
                     삭제
                   </button>

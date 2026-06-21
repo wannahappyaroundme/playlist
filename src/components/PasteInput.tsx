@@ -74,7 +74,7 @@ export default function PasteInput({ onAdd }: PasteInputProps) {
         onChange={(e) => setValue(e.target.value)}
         rows={3}
         placeholder="YouTube 링크를 붙여넣으세요 (여러 줄 가능)"
-        className="w-full resize-none rounded-xl bg-white/5 p-3 text-sm text-white placeholder-white/40 outline-none ring-1 ring-white/10 focus:ring-white/30"
+        className="w-full resize-none rounded-xl bg-white/5 p-3 text-sm text-white placeholder-white/60 outline-none ring-1 ring-white/10 focus:ring-white/30"
       />
       <button
         type="button"

@@ -156,6 +156,7 @@ export default function Editor() {
   return (
     <div className="min-h-screen px-6 py-10 text-white">
       <AppBackground />
+      <div className="mx-auto max-w-3xl">
       <header className="mb-6 flex items-center justify-between">
         <Link to="/" className="text-sm text-white/60 hover:text-white">← 갤러리</Link>
         <Link to={`/p/${playlist.id}`} className="text-sm text-white/60 hover:text-white">재생 →</Link>
@@ -246,7 +247,7 @@ export default function Editor() {
             onChange={(e) => setQuery(e.target.value)}
           />
           {filtering ? (
-            <div className="flex items-center justify-between px-1 text-[11px] text-white/40">
+            <div className="flex items-center justify-between px-1 text-xs text-white/60">
               <span>검색 중에는 순서 변경이 꺼져요</span>
               <span>{songs.length}곡 중 {displayed.length}곡</span>
             </div>
@@ -271,7 +272,7 @@ export default function Editor() {
             onDrop={canReorder ? () => handleDrop(s.id) : undefined}
             onDragEnd={canReorder ? () => setDragId(null) : undefined}
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               {canReorder ? (
                 <span
                   aria-hidden="true"
@@ -293,7 +294,7 @@ export default function Editor() {
                 aria-pressed={isCover}
                 onClick={() => setCover(s.id)}
                 className={
-                  'rounded-lg px-2 py-1 text-xs transition ' +
+                  'rounded-lg px-1.5 py-1 text-xs transition ' +
                   (isCover
                     ? 'bg-white/25 text-white ring-1 ring-white/40'
                     : 'bg-white/10 text-white/70 hover:bg-white/20')
@@ -307,17 +308,17 @@ export default function Editor() {
                 aria-busy={reResolvingId === s.id}
                 disabled={reResolvingId !== null}
                 onClick={() => handleReResolve(s.id)}
-                className="rounded-lg bg-white/10 px-2 py-1 text-xs disabled:opacity-50"
+                className="rounded-lg bg-white/10 px-1.5 py-1 text-xs disabled:opacity-50"
               >
                 {reResolvingId === s.id ? '찾는 중…' : '다시 찾기'}
               </button>
               {canReorder ? (
                 <>
-                  <button type="button" aria-label="위로" onClick={() => move(s.id, -1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↑</button>
-                  <button type="button" aria-label="아래로" onClick={() => move(s.id, 1)} className="rounded-lg bg-white/10 px-2 py-1 text-xs">↓</button>
+                  <button type="button" aria-label="위로" onClick={() => move(s.id, -1)} className="rounded-lg bg-white/10 px-1.5 py-1 text-xs">↑</button>
+                  <button type="button" aria-label="아래로" onClick={() => move(s.id, 1)} className="rounded-lg bg-white/10 px-1.5 py-1 text-xs">↓</button>
                 </>
               ) : null}
-              <button type="button" aria-label="삭제" onClick={() => removeById(s.id)} className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-200">✕</button>
+              <button type="button" aria-label="삭제" onClick={() => removeById(s.id)} className="rounded-lg bg-red-500/20 px-1.5 py-1 text-xs text-red-200">✕</button>
             </div>
             {shareSongId === s.id ? (
               <div data-testid="single-share" className="rounded-2xl bg-white/5 p-4">
@@ -347,6 +348,7 @@ export default function Editor() {
           <p className="mb-3 text-xs text-white/40">공유는 약 50곡까지 권장해요</p>
         ) : null}
         <QrShare url={shareUrl} />
+      </div>
       </div>
     </div>
   );

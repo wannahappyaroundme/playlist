@@ -53,10 +53,10 @@ export default function Controls({
   const max = Number.isFinite(duration) && duration > 0 ? duration : 0;
 
   return (
-    <div className="flex w-full flex-col gap-3 rounded-2xl bg-white/5 px-5 py-4 backdrop-blur-md ring-1 ring-white/10">
+    <div className="flex w-full flex-col gap-3 rounded-2xl bg-black/30 px-5 py-4 backdrop-blur-md ring-1 ring-white/15">
       {/* progress bar */}
       <div
-        className="flex items-center gap-3 text-xs text-white/70"
+        className="flex items-center gap-3 text-xs text-white/85"
         style={{ fontVariantNumeric: 'tabular-nums' }}
       >
         <span>{formatTime(progress)}</span>
@@ -74,7 +74,7 @@ export default function Controls({
       </div>
 
       {/* transport */}
-      <div className="flex items-center justify-center gap-6">
+      <div className="flex items-center justify-center gap-4 sm:gap-6">
         <button
           type="button"
           data-testid="shuffle-btn"
@@ -93,7 +93,7 @@ export default function Controls({
           type="button"
           aria-label="prev"
           onClick={onPrev}
-          className="text-white transition hover:opacity-80 active:scale-90"
+          className="flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/10 active:scale-90"
         >
           <PrevIcon className="h-7 w-7" />
         </button>
@@ -115,7 +115,7 @@ export default function Controls({
           type="button"
           aria-label="next"
           onClick={onNext}
-          className="text-white transition hover:opacity-80 active:scale-90"
+          className="flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/10 active:scale-90"
         >
           <NextIcon className="h-7 w-7" />
         </button>
