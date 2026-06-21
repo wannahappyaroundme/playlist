@@ -304,4 +304,30 @@ describe('Editor', () => {
     await userEvent.type(screen.getByLabelText('곡 검색'), 's3');
     expect(container.querySelectorAll('li[draggable="true"]').length).toBe(0);
   });
+
+  // ---- Item 3: share-length warnings ----
+  it('shows the title-dropped note when titlesDropped is true', () => {
+    buildSharePayloadMock.mockReturnValue({ encoded: 'ENC', titlesDropped: true, tooLong: false });
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1']));
+    renderEditor();
+    expect(screen.getByText('곡이 많아 공유 링크에서 곡 제목은 생략돼요')).toBeInTheDocument();
+  });
+
+  it('shows the stronger broken-link warning when tooLong is true', () => {
+    buildSharePayloadMock.mockReturnValue({ encoded: 'ENC', titlesDropped: true, tooLong: true });
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1']));
+    renderEditor();
+    expect(
+      screen.getByText('곡이 너무 많아 공유 링크가 깨질 수 있어요 — 곡 수를 줄여주세요'),
+    ).toBeInTheDocument();
+    // and not the milder note (tooLong takes precedence)
+    expect(screen.queryByText('곡이 많아 공유 링크에서 곡 제목은 생략돼요')).toBeNull();
+  });
+
+  it('shows the soft ~50곡 hint for large playlists when nothing was dropped', () => {
+    buildSharePayloadMock.mockReturnValue({ encoded: 'ENC', titlesDropped: false, tooLong: false });
+    getPlaylistMock.mockReturnValue(pl(Array.from({ length: 41 }, (_, i) => 's' + i)));
+    renderEditor();
+    expect(screen.getByText('공유는 약 50곡까지 권장해요')).toBeInTheDocument();
+  });
 });

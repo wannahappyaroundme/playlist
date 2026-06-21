@@ -15,6 +15,8 @@ const CARD_COLORS = ['#a855f7', '#6366f1', '#3b82f6', '#14b8a6', '#22c55e', '#f5
 
 // 곡이 이보다 많을 때만 검색창을 노출(작은 목록은 깔끔하게 유지).
 const SEARCH_MIN_SONGS = 5;
+// 곡이 이보다 많으면 공유 링크 길이를 미리 부드럽게 안내(약 50곡 권장).
+const SHARE_SOFT_LIMIT = 40;
 
 export default function Editor() {
   const { playlistId } = useParams();
@@ -129,7 +131,7 @@ export default function Editor() {
 
   const shareBase = `${window.location.origin}${window.location.pathname}#/s/`;
 
-  const { encoded } = buildSharePayload(
+  const { encoded, titlesDropped, tooLong } = buildSharePayload(
     { title: playlist.title, message: playlist.message, from: playlist.from, color: playlist.color },
     songs.map((s) => ({ id: s.id, title: s.title })),
   );
@@ -333,6 +335,17 @@ export default function Editor() {
         <p className="mb-3 text-xs text-white/40">
           이 링크는 받은 사람 누구나 열 수 있어요 — 비밀 메시지는 넣지 마세요.
         </p>
+        {tooLong ? (
+          <p className="mb-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-200">
+            곡이 너무 많아 공유 링크가 깨질 수 있어요 — 곡 수를 줄여주세요
+          </p>
+        ) : titlesDropped ? (
+          <p className="mb-3 text-xs text-amber-200/80">
+            곡이 많아 공유 링크에서 곡 제목은 생략돼요
+          </p>
+        ) : songs.length >= SHARE_SOFT_LIMIT ? (
+          <p className="mb-3 text-xs text-white/40">공유는 약 50곡까지 권장해요</p>
+        ) : null}
         <QrShare url={shareUrl} />
       </div>
     </div>
