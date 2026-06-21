@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { createYtPlayer, YT_STATE, type YtPlayer } from '../lib/ytPlayer';
 import { nextIndex, prevIndex } from '../lib/queue';
-import { saveSong } from '../lib/storage';
+import { saveSong, StorageWriteError } from '../lib/storage';
 import type { Song, RepeatMode } from '../types';
 
 /** 반복 모드 순환: off → all → one → off. */
@@ -222,8 +222,13 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
           queueRef.current = copy;
           return copy;
         });
-        // 영속 풀도 갱신
-        saveSong(healed);
+        // 영속 풀도 갱신 — quota 초과여도 진행도 인터벌이 죽지 않게 삼킨다(인메모리 큐는 이미 갱신됨).
+        try {
+          saveSong(healed);
+        } catch (err) {
+          if (!(err instanceof StorageWriteError)) throw err;
+          // 저장 공간 부족: 자가치유 영속화만 건너뛴다(다음 곡 진행/재생은 계속).
+        }
       }
     }, 250);
     return () => window.clearInterval(id);

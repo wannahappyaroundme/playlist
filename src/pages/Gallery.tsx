@@ -49,6 +49,7 @@ export default function Gallery() {
   const handleNew = () => {
     const title = '새 플레이리스트';
     const p = create(title);
+    if (!p) return; // quota 초과 등으로 저장 실패 → 반쪽 상태로 이동하지 않는다(create가 안내함)
     navigate(`/edit/${p.id}`);
   };
 

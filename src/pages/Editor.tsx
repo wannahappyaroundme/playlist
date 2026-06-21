@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getPlaylist, savePlaylist, getSong } from '../lib/storage';
+import { getPlaylist, savePlaylist, getSong, StorageWriteError } from '../lib/storage';
 import { buildSharePayload } from '../lib/share';
 import { useSongResolver } from '../hooks/useSongResolver';
 import PasteInput from '../components/PasteInput';
@@ -36,8 +36,18 @@ export default function Editor() {
     // Keep the dead-no-more coverVideoId field in sync with the first song so
     // gallery cards can show a representative cover thumbnail (Fix 16).
     const synced: Playlist = { ...next, coverVideoId: next.songIds[0] };
+    // 먼저 저장하고, 성공했을 때만 React 상태를 갱신한다 — quota 초과면 저장 안 된 값을
+    // 화면에 반영하지 않고(롤백) 안내만 한다.
+    try {
+      savePlaylist(synced);
+    } catch (err) {
+      if (err instanceof StorageWriteError) {
+        window.alert('저장 공간이 가득 찼어요 — 갤러리에서 내보내기로 백업 후 정리해 주세요');
+        return; // setPlaylist 호출 안 함(미저장 값이 화면에 남지 않게)
+      }
+      throw err;
+    }
     setPlaylist(synced);
-    savePlaylist(synced);
   };
 
   if (!playlist) {

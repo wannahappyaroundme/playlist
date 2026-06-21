@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { Playlist } from '../types';
 
+const { StorageWriteErrorMock } = vi.hoisted(() => ({ StorageWriteErrorMock: class extends Error {} }));
 vi.mock('../lib/storage', () => ({
   loadPlaylists: vi.fn(),
   createPlaylist: vi.fn(),
   savePlaylist: vi.fn(),
   deletePlaylist: vi.fn(),
+  StorageWriteError: StorageWriteErrorMock,
 }));
 
 import * as storage from '../lib/storage';
@@ -44,6 +46,20 @@ describe('usePlaylists', () => {
     expect(storage.savePlaylist).toHaveBeenCalledWith(created);
     expect(returned).toEqual(created);
     expect(result.current.playlists.map(p => p.id)).toEqual(['new']);
+  });
+
+  it('P0-4: create returns null and alerts when storage is full (no state change)', () => {
+    (storage.loadPlaylists as any).mockReturnValue([]);
+    (storage.createPlaylist as any).mockReturnValue(mk('new'));
+    (storage.savePlaylist as any).mockImplementation(() => { throw new StorageWriteErrorMock('full'); });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const { result } = renderHook(() => usePlaylists());
+    let returned: Playlist | null | undefined;
+    act(() => { returned = result.current.create('My List'); });
+    expect(returned).toBeNull();
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('저장 공간이 가득'));
+    expect(result.current.playlists).toEqual([]); // unchanged
+    alertSpy.mockRestore();
   });
 
   it('remove calls storage.deletePlaylist and refreshes', () => {

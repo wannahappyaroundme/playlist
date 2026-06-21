@@ -7,10 +7,12 @@ import type { Song, Playlist } from '../types';
 const savePlaylistMock = vi.fn();
 const getPlaylistMock = vi.fn();
 const getSongMock = vi.fn();
+const { StorageWriteErrorMock } = vi.hoisted(() => ({ StorageWriteErrorMock: class extends Error {} }));
 vi.mock('../lib/storage', () => ({
   getPlaylist: (...a: any[]) => getPlaylistMock(...a),
   savePlaylist: (...a: any[]) => savePlaylistMock(...a),
   getSong: (...a: any[]) => getSongMock(...a),
+  StorageWriteError: StorageWriteErrorMock,
 }));
 const buildSharePayloadMock = vi.fn((..._a: any[]) => ({ encoded: 'ENC', titlesDropped: false }));
 vi.mock('../lib/share', () => ({
@@ -111,6 +113,18 @@ describe('Editor', () => {
     const calls = savePlaylistMock.mock.calls;
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.songIds).toEqual(['s0', 's2']);
+  });
+
+  it('P0-4: a quota error while persisting alerts and keeps the edit out of state', async () => {
+    savePlaylistMock.mockImplementation(() => { throw new StorageWriteErrorMock('full'); });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    renderEditor();
+    const input = screen.getByLabelText('제목') as HTMLInputElement;
+    await userEvent.type(input, 'x');
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('저장 공간이 가득'));
+    // input still shows the persisted (unchanged) title, not the un-saved keystroke
+    expect((screen.getByLabelText('제목') as HTMLInputElement).value).toBe('My List');
+    alertSpy.mockRestore();
   });
 
   it('clicking "가사/메타 다시 찾기" calls reResolve(song.id)', async () => {

@@ -15,7 +15,8 @@ vi.mock('../lib/ytPlayer', () => ({
     return new Promise(() => {}); // never resolves
   }),
 }));
-vi.mock('../lib/storage', () => ({ saveSong: vi.fn() }));
+const { StorageWriteErrorMock } = vi.hoisted(() => ({ StorageWriteErrorMock: class extends Error {} }));
+vi.mock('../lib/storage', () => ({ saveSong: vi.fn(), StorageWriteError: StorageWriteErrorMock }));
 
 import { PlaybackProvider, usePlayback } from './PlaybackContext';
 import { saveSong } from '../lib/storage';
@@ -192,6 +193,32 @@ describe('usePlayback durationSec self-heal', () => {
       // persisted once (loop guard: only once per song load)
       expect((saveSong as any).mock.calls.length).toBe(1);
       expect((saveSong as any).mock.calls[0][0]).toMatchObject({ id: 'a1', durationSec: 130 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('P0-4: a quota error from the self-heal saveSong does not kill the sampler', async () => {
+    vi.useFakeTimers();
+    try {
+      installFakePlayer();
+      fakePlayer.getDuration = vi.fn(() => 130);
+      fakePlayer.getCurrentTime = vi.fn(() => 5);
+      (saveSong as any).mockImplementation(() => { throw new StorageWriteErrorMock('full'); });
+
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      await vi.waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+      act(() => result.current.playQueue([song('a1')], 0));
+      act(() => capturedHandlers.onStateChange!(1));
+
+      // sampler must keep running past the throwing saveSong (no unhandled crash)
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+
+      // in-memory queue still healed even though persistence threw
+      expect(result.current.queue[0].durationSec).toBe(130);
+      // progress kept sampling (current time read after the throw)
+      expect(result.current.progress).toBe(5);
     } finally {
       vi.useRealTimers();
     }
