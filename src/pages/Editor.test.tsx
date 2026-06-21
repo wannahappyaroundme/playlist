@@ -146,6 +146,52 @@ describe('Editor', () => {
     await waitFor(() => expect(reResolveMock).toHaveBeenCalledWith('s0'));
   });
 
+  it('P1-A: clicking "대표로" persists coverVideoId = that song id', async () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    renderEditor();
+    const covers = screen.getAllByRole('button', { name: '대표로' });
+    await userEvent.click(covers[1]); // make s1 the cover
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.coverVideoId).toBe('s1');
+  });
+
+  it('P1-A: an explicit cover survives a reorder (no longer forced to songIds[0])', async () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    renderEditor();
+    // pin s1 as cover
+    const covers = screen.getAllByRole('button', { name: '대표로' });
+    await userEvent.click(covers[1]);
+    // now reorder: move s0 down (or s2 up) — cover must stay s1, not become songIds[0]
+    const downs = screen.getAllByRole('button', { name: '아래로' });
+    await userEvent.click(downs[0]); // s0 <-> s1 => order [s1, s0, s2]
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.coverVideoId).toBe('s1'); // preserved, not overwritten to songIds[0]
+  });
+
+  it('P1-A: persist defaults coverVideoId to songIds[0] when none is pinned', () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1']));
+    renderEditor();
+    lastOnAdd!(song('s2')); // any persist
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.coverVideoId).toBe('s0');
+  });
+
+  it('P1-A: a pinned cover that is removed falls back to songIds[0]', async () => {
+    getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
+    renderEditor();
+    const covers = screen.getAllByRole('button', { name: '대표로' });
+    await userEvent.click(covers[1]); // pin s1
+    const dels = screen.getAllByRole('button', { name: '삭제' });
+    await userEvent.click(dels[1]); // remove s1 => songIds [s0, s2]
+    const calls = savePlaylistMock.mock.calls;
+    const saved = calls[calls.length - 1][0] as Playlist;
+    expect(saved.songIds).toEqual(['s0', 's2']);
+    expect(saved.coverVideoId).toBe('s0'); // pinned cover gone → fall back
+  });
+
   it('"이 곡만 보내기" reveals a single-song share built from exactly one song', async () => {
     getPlaylistMock.mockReturnValue(pl(['s0', 's1', 's2']));
     renderEditor();

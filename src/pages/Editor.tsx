@@ -33,9 +33,15 @@ export default function Editor() {
   );
 
   const persist = (next: Playlist) => {
-    // Keep the dead-no-more coverVideoId field in sync with the first song so
-    // gallery cards can show a representative cover thumbnail (Fix 16).
-    const synced: Playlist = { ...next, coverVideoId: next.songIds[0] };
+    // 대표 표지(coverVideoId): 사용자가 직접 고른 표지가 아직 목록에 있으면 그대로 보존하고
+    // (재정렬해도 갤러리 카드가 바뀌지 않게), 없으면 첫 곡으로 폴백한다(P1-A).
+    const synced: Playlist = {
+      ...next,
+      coverVideoId:
+        next.coverVideoId && next.songIds.includes(next.coverVideoId)
+          ? next.coverVideoId
+          : next.songIds[0],
+    };
     // 먼저 저장하고, 성공했을 때만 React 상태를 갱신한다 — quota 초과면 저장 안 된 값을
     // 화면에 반영하지 않고(롤백) 안내만 한다.
     try {
@@ -79,6 +85,11 @@ export default function Editor() {
   const removeAt = (index: number) => {
     const ids = playlist.songIds.filter((_, i) => i !== index);
     persist({ ...playlist, songIds: ids });
+  };
+
+  // 대표 표지로 지정: 해당 곡을 갤러리 카드의 대표 표지로 고정한다(persist가 보존 처리, P1-A).
+  const setCover = (songId: string) => {
+    persist({ ...playlist, coverVideoId: songId });
   };
 
   // 가사/메타가 안 잡힌 곡을 캐시 무시하고 강제로 다시 찾아 풀을 덮어쓴 뒤 목록을 갱신한다.
@@ -197,7 +208,11 @@ export default function Editor() {
       <PasteInput onAdd={handleAdd} />
 
       <ul className="mt-6 space-y-2">
-        {songs.map((s, i) => (
+        {songs.map((s, i) => {
+          // 갤러리에 실제로 보일 대표 표지(고른 표지 우선, 없으면 첫 곡).
+          const effectiveCover = playlist.coverVideoId ?? playlist.songIds[0];
+          const isCover = s.id === effectiveCover;
+          return (
           <li key={s.id} className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <div className="basis-full grow min-w-0 sm:basis-0">
@@ -206,6 +221,20 @@ export default function Editor() {
                   onShare={() => setShareSongId((id) => (id === s.id ? null : s.id))}
                 />
               </div>
+              <button
+                type="button"
+                aria-label="대표로"
+                aria-pressed={isCover}
+                onClick={() => setCover(s.id)}
+                className={
+                  'rounded-lg px-2 py-1 text-xs transition ' +
+                  (isCover
+                    ? 'bg-white/25 text-white ring-1 ring-white/40'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20')
+                }
+              >
+                {isCover ? '대표' : '대표로'}
+              </button>
               <button
                 type="button"
                 aria-label="가사/메타 다시 찾기"
@@ -227,7 +256,8 @@ export default function Editor() {
               </div>
             ) : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <div className="mt-10">
