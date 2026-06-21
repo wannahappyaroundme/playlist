@@ -101,6 +101,7 @@ export default function Player() {
             <Controls
               isPlaying={playback.isPlaying}
               repeat={playback.repeat}
+              shuffle={playback.shuffle}
               progress={playback.progress}
               duration={playback.duration}
               onToggle={playback.togglePlay}
@@ -108,6 +109,7 @@ export default function Player() {
               onPrev={playback.prev}
               onSeek={playback.seek}
               onCycleRepeat={playback.cycleRepeat}
+              onToggleShuffle={playback.toggleShuffle}
             />
           </div>
         </div>

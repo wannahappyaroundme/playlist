@@ -20,6 +20,7 @@ describe('Controls', () => {
   const base = {
     isPlaying: false,
     repeat: 'off' as const,
+    shuffle: false,
     progress: 30,
     duration: 200,
     onToggle: vi.fn(),
@@ -27,6 +28,7 @@ describe('Controls', () => {
     onPrev: vi.fn(),
     onSeek: vi.fn(),
     onCycleRepeat: vi.fn(),
+    onToggleShuffle: vi.fn(),
   };
 
   it('shows a Play label when paused and Pause label when playing', () => {
@@ -66,6 +68,22 @@ describe('Controls', () => {
     render(<Controls {...base} onCycleRepeat={onCycleRepeat} />);
     await userEvent.click(screen.getByTestId('repeat-btn'));
     expect(onCycleRepeat).toHaveBeenCalledTimes(1);
+  });
+
+  it('reflects shuffle state via aria-pressed', () => {
+    const { rerender } = render(<Controls {...base} shuffle={false} />);
+    const btn = () => screen.getByTestId('shuffle-btn');
+    expect(btn()).toHaveAttribute('aria-pressed', 'false');
+    expect(btn()).toHaveAttribute('aria-label', 'shuffle');
+    rerender(<Controls {...base} shuffle />);
+    expect(btn()).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('calls onToggleShuffle when the shuffle button is clicked', async () => {
+    const onToggleShuffle = vi.fn();
+    render(<Controls {...base} onToggleShuffle={onToggleShuffle} />);
+    await userEvent.click(screen.getByTestId('shuffle-btn'));
+    expect(onToggleShuffle).toHaveBeenCalledTimes(1);
   });
 
   it('calls onSeek with the new value when the progress slider changes', () => {

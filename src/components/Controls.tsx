@@ -1,8 +1,18 @@
 import type { RepeatMode } from '../types';
+import {
+  PrevIcon,
+  NextIcon,
+  PlayIcon,
+  PauseIcon,
+  RepeatIcon,
+  RepeatOneIcon,
+  ShuffleIcon,
+} from './icons';
 
 interface ControlsProps {
   isPlaying: boolean;
   repeat: RepeatMode;
+  shuffle: boolean;
   progress: number;
   duration: number;
   onToggle(): void;
@@ -10,6 +20,7 @@ interface ControlsProps {
   onPrev(): void;
   onSeek(sec: number): void;
   onCycleRepeat(): void;
+  onToggleShuffle(): void;
 }
 
 export function formatTime(sec: number): string {
@@ -26,14 +37,10 @@ function repeatLabel(mode: RepeatMode): string {
   return 'repeat off';
 }
 
-function repeatIcon(mode: RepeatMode): string {
-  if (mode === 'one') return '🔂';
-  return '🔁';
-}
-
 export default function Controls({
   isPlaying,
   repeat,
+  shuffle,
   progress,
   duration,
   onToggle,
@@ -41,6 +48,7 @@ export default function Controls({
   onPrev,
   onSeek,
   onCycleRepeat,
+  onToggleShuffle,
 }: ControlsProps) {
   const max = Number.isFinite(duration) && duration > 0 ? duration : 0;
 
@@ -69,11 +77,27 @@ export default function Controls({
       <div className="flex items-center justify-center gap-6">
         <button
           type="button"
+          data-testid="shuffle-btn"
+          aria-pressed={shuffle}
+          aria-label="shuffle"
+          onClick={onToggleShuffle}
+          className={
+            'mr-2 flex h-10 w-10 items-center justify-center rounded-full transition ' +
+            (shuffle
+              ? 'bg-white/15 text-white ring-1 ring-white/30'
+              : 'text-white/40 hover:text-white/70')
+          }
+        >
+          <ShuffleIcon className="h-5 w-5" />
+        </button>
+
+        <button
+          type="button"
           aria-label="prev"
           onClick={onPrev}
-          className="text-2xl text-white/80 transition hover:text-white active:scale-90"
+          className="text-white/80 transition hover:text-white active:scale-90"
         >
-          ⏮
+          <PrevIcon className="h-7 w-7" />
         </button>
 
         <button
@@ -83,13 +107,9 @@ export default function Controls({
           className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black transition active:scale-95"
         >
           {isPlaying ? (
-            <svg viewBox="0 0 24 24" className="h-7 w-7 fill-current" aria-hidden="true">
-              <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
-            </svg>
+            <PauseIcon className="h-7 w-7" />
           ) : (
-            <svg viewBox="0 0 24 24" className="ml-0.5 h-7 w-7 fill-current" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+            <PlayIcon className="ml-0.5 h-7 w-7" />
           )}
         </button>
 
@@ -97,9 +117,9 @@ export default function Controls({
           type="button"
           aria-label="next"
           onClick={onNext}
-          className="text-2xl text-white/80 transition hover:text-white active:scale-90"
+          className="text-white/80 transition hover:text-white active:scale-90"
         >
-          ⏭
+          <NextIcon className="h-7 w-7" />
         </button>
 
         <button
@@ -110,13 +130,17 @@ export default function Controls({
           aria-label={repeatLabel(repeat)}
           onClick={onCycleRepeat}
           className={
-            'ml-2 flex h-10 w-10 items-center justify-center rounded-full text-lg transition ' +
+            'ml-2 flex h-10 w-10 items-center justify-center rounded-full transition ' +
             (repeat === 'off'
               ? 'text-white/40 hover:text-white/70'
               : 'bg-white/15 text-white ring-1 ring-white/30')
           }
         >
-          {repeatIcon(repeat)}
+          {repeat === 'one' ? (
+            <RepeatOneIcon className="h-5 w-5" />
+          ) : (
+            <RepeatIcon className="h-5 w-5" />
+          )}
         </button>
       </div>
     </div>
