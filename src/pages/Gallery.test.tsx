@@ -37,6 +37,13 @@ describe('Gallery', () => {
     expect(screen.getByText('Yejin Playlist')).toBeInTheDocument();
   });
 
+  it('sweeps orphan pool songs once on mount (GC)', () => {
+    const sweepSpy = vi.spyOn(storage, 'sweepOrphans').mockReturnValue(0);
+    renderGallery();
+    expect(sweepSpy).toHaveBeenCalledTimes(1);
+    sweepSpy.mockRestore();
+  });
+
   it('renders a card for each playlist with a link', () => {
     playlistsMock = [mk('aa', 'Late Night'), mk('bb', 'Morning')];
     renderGallery();

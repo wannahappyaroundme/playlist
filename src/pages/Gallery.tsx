@@ -1,8 +1,8 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { thumbnailUrl } from '../lib/youtube';
-import { getSong, exportAll, importAll } from '../lib/storage';
+import { getSong, exportAll, importAll, sweepOrphans } from '../lib/storage';
 import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb } from '../lib/colors';
 import AppBackground from '../components/AppBackground';
 
@@ -45,6 +45,16 @@ export default function Gallery() {
   const { playlists, create, remove, refresh } = usePlaylists();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 갤러리 진입 때 어떤 플레이리스트도 참조하지 않는 고아 곡을 정리해 풀(quota)을 자가 관리한다.
+  // 마운트 1회만 실행(저장 실패해도 화면에는 영향 없음).
+  useEffect(() => {
+    try {
+      sweepOrphans();
+    } catch {
+      // 정리 실패는 치명적이지 않으므로 조용히 무시(다음 진입에서 재시도).
+    }
+  }, []);
 
   const handleNew = () => {
     const title = '새 플레이리스트';
