@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import type { Playlist } from '../types';
 import {
   loadPlaylists,
+  getPlaylist,
   createPlaylist,
   savePlaylist,
   deletePlaylist,
@@ -33,10 +34,52 @@ export function usePlaylists() {
     return p;
   }, []);
 
+  // 제목만 바꿔 저장한다(quota 실패면 안내만 하고 상태는 그대로 둔다).
+  const rename = useCallback((id: string, title: string) => {
+    const p = getPlaylist(id);
+    if (!p) return; // 없는 id면 조용히 무시
+    try {
+      savePlaylist({ ...p, title });
+    } catch (err) {
+      if (err instanceof StorageWriteError) {
+        window.alert(QUOTA_MSG);
+        return;
+      }
+      throw err;
+    }
+    setPlaylists(loadPlaylists());
+  }, []);
+
+  // 같은 내용으로 새 플레이리스트를 만든다("(사본)" 접미사). quota 초과면 null을 반환.
+  const duplicate = useCallback((id: string): Playlist | null => {
+    const src = getPlaylist(id);
+    if (!src) return null;
+    const copy = createPlaylist(`${src.title} (사본)`);
+    const withContent: Playlist = {
+      ...copy,
+      songIds: [...src.songIds],
+      message: src.message,
+      from: src.from,
+      color: src.color,
+      coverVideoId: src.coverVideoId,
+    };
+    try {
+      savePlaylist(withContent);
+    } catch (err) {
+      if (err instanceof StorageWriteError) {
+        window.alert(QUOTA_MSG);
+        return null;
+      }
+      throw err;
+    }
+    setPlaylists(loadPlaylists());
+    return withContent;
+  }, []);
+
   const remove = useCallback((id: string) => {
     deletePlaylist(id);
     setPlaylists(loadPlaylists());
   }, []);
 
-  return { playlists, refresh, create, remove };
+  return { playlists, refresh, create, rename, duplicate, remove };
 }

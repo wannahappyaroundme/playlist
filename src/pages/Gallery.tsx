@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { thumbnailUrl } from '../lib/youtube';
@@ -42,9 +42,29 @@ function CoverThumb({ id, playlistId }: { id?: string; playlistId: string }) {
 }
 
 export default function Gallery() {
-  const { playlists, create, remove, refresh } = usePlaylists();
+  const { playlists, create, rename, duplicate, remove, refresh } = usePlaylists();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 인라인 이름변경 중인 카드 id(없으면 null). 입력값은 draft에 보관한다.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  const startRename = (id: string, current: string) => {
+    setEditingId(id);
+    setDraft(current);
+  };
+
+  // 이름변경 커밋: 공백 제거 후 비어있지 않고 바뀐 경우에만 저장한다. 항상 편집 모드를 닫는다.
+  const commitRename = (id: string) => {
+    const next = draft.trim();
+    const cur = playlists.find((p) => p.id === id)?.title ?? '';
+    if (next && next !== cur) rename(id, next);
+    setEditingId(null);
+  };
+
+  const handleDuplicate = (id: string) => {
+    duplicate(id); // 성공 시 hook이 목록을 새로고침한다(quota 실패면 안내만)
+  };
 
   // 갤러리 진입 때 어떤 플레이리스트도 참조하지 않는 고아 곡을 정리해 풀(quota)을 자가 관리한다.
   // 마운트 1회만 실행(저장 실패해도 화면에는 영향 없음).
@@ -171,23 +191,55 @@ export default function Gallery() {
                 <Link to={`/p/${p.id}`} className="block transition hover:opacity-90">
                   <CoverThumb id={coverId} playlistId={p.id} />
                 </Link>
-                {/* 제목 옆 편집, 곡수 옆 삭제 */}
+                {/* 제목(또는 이름변경 입력) + 곡수 */}
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium drop-shadow">{p.title}</p>
+                  {editingId === p.id ? (
+                    <input
+                      aria-label="이름 변경"
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => commitRename(p.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename(p.id);
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      className="min-w-0 grow rounded-md bg-black/35 px-2 py-0.5 text-sm font-medium text-white outline-none ring-1 ring-white/30"
+                    />
+                  ) : (
+                    <p className="truncate text-sm font-medium drop-shadow">{p.title}</p>
+                  )}
+                  <p className="shrink-0 text-xs text-white/80">{p.songIds.length}곡</p>
+                </div>
+                {/* 액션: 편집 / 이름변경 / 복제 / 삭제 */}
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <Link
                     to={`/edit/${p.id}`}
-                    className="shrink-0 rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
                   >
                     편집
                   </Link>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <p className="text-xs text-white/80">{p.songIds.length}곡</p>
+                  <button
+                    type="button"
+                    aria-label={`${p.title} 이름변경`}
+                    onClick={() => startRename(p.id, p.title)}
+                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                  >
+                    이름변경
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${p.title} 복제`}
+                    onClick={() => handleDuplicate(p.id)}
+                    className="rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-black/45"
+                  >
+                    복제
+                  </button>
                   <button
                     type="button"
                     aria-label={`${p.title} 삭제`}
                     onClick={() => handleDelete(p.id, p.title)}
-                    className="shrink-0 rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-red-500/55 hover:text-white"
+                    className="ml-auto rounded-md bg-black/25 px-2 py-0.5 text-xs text-white/85 transition hover:bg-red-500/55 hover:text-white"
                   >
                     삭제
                   </button>

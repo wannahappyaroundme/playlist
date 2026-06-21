@@ -6,10 +6,19 @@ import type { Playlist } from '../types';
 
 const createMock = vi.fn();
 const removeMock = vi.fn();
+const renameMock = vi.fn();
+const duplicateMock = vi.fn();
 let playlistsMock: Playlist[] = [];
 
 vi.mock('../hooks/usePlaylists', () => ({
-  usePlaylists: () => ({ playlists: playlistsMock, refresh: vi.fn(), create: createMock, remove: removeMock }),
+  usePlaylists: () => ({
+    playlists: playlistsMock,
+    refresh: vi.fn(),
+    create: createMock,
+    rename: renameMock,
+    duplicate: duplicateMock,
+    remove: removeMock,
+  }),
 }));
 
 const navigateMock = vi.fn();
@@ -102,6 +111,35 @@ describe('Gallery', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 삭제' }));
     expect(removeMock).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it('P1-B: clicking 이름변경 swaps the title for an input that commits on Enter', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    renderGallery();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 이름변경' }));
+    const input = screen.getByLabelText('이름 변경') as HTMLInputElement;
+    await userEvent.setup().clear(input);
+    await userEvent.setup().type(input, 'New Name{Enter}');
+    expect(renameMock).toHaveBeenCalledWith('aa', 'New Name');
+  });
+
+  it('P1-B: rename input commits on blur', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    renderGallery();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 이름변경' }));
+    const input = screen.getByLabelText('이름 변경') as HTMLInputElement;
+    await userEvent.setup().clear(input);
+    await userEvent.setup().type(input, 'Blurred');
+    input.blur();
+    await waitFor(() => expect(renameMock).toHaveBeenCalledWith('aa', 'Blurred'));
+  });
+
+  it('P1-B: clicking 복제 calls duplicate(id)', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    duplicateMock.mockReturnValue(mk('copy', 'Late Night (사본)'));
+    renderGallery();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 복제' }));
+    expect(duplicateMock).toHaveBeenCalledWith('aa');
   });
 
   it('renders 내보내기 / 가져오기 backup buttons in the header', () => {
