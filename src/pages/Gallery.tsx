@@ -7,6 +7,8 @@ import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb } from '../lib/colors';
 import AppBackground from '../components/AppBackground';
 
 const EMPTY_BOX = 'aspect-square rounded-xl bg-white/5';
+// 백업 안내 배너를 한 번 닫으면 다시 안 뜨도록 기억하는 localStorage 키.
+const BACKUP_NOTICE_KEY = 'yejin.backupNoticeDismissed';
 
 // 곡 추출색(accent)으로 카드 전체를 같은 색상의 '밝게→어둡게' 그라데이션으로 칠한다.
 // 추출색이 어두워도 채도를 끌어올려 '플레이리스트'처럼 또렷한 색이 보이게 하고,
@@ -48,6 +50,19 @@ export default function Gallery() {
   // 인라인 이름변경 중인 카드 id(없으면 null). 입력값은 draft에 보관한다.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  // 백업 안내 배너: 한 번 닫으면 localStorage에 기록해 다시 안 띄운다.
+  const [backupNoticeDismissed, setBackupNoticeDismissed] = useState(
+    () => localStorage.getItem(BACKUP_NOTICE_KEY) === '1',
+  );
+
+  const dismissBackupNotice = () => {
+    try {
+      localStorage.setItem(BACKUP_NOTICE_KEY, '1');
+    } catch {
+      // 저장 실패해도 이 세션 동안은 닫힌 상태를 유지(치명적 아님).
+    }
+    setBackupNoticeDismissed(true);
+  };
 
   const startRename = (id: string, current: string) => {
     setEditingId(id);
@@ -164,6 +179,20 @@ export default function Gallery() {
           </button>
         </div>
       </header>
+
+      {playlists.length > 0 && !backupNoticeDismissed ? (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 text-xs text-white/80 backdrop-blur">
+          <p>플레이리스트는 이 기기에만 저장돼요 — 가끔 ‘내보내기’로 백업하세요.</p>
+          <button
+            type="button"
+            aria-label="백업 안내 닫기"
+            onClick={dismissBackupNotice}
+            className="shrink-0 rounded-md px-2 py-0.5 text-white/60 transition hover:bg-white/10 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       {playlists.length === 0 ? (
         <div className="mt-28 text-center text-white/75">

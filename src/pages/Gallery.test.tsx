@@ -39,7 +39,7 @@ function renderGallery() {
 }
 
 describe('Gallery', () => {
-  beforeEach(() => { vi.clearAllMocks(); playlistsMock = []; });
+  beforeEach(() => { vi.clearAllMocks(); playlistsMock = []; localStorage.clear(); });
 
   it('shows the brand title "Yejin Playlist"', () => {
     renderGallery();
@@ -140,6 +140,34 @@ describe('Gallery', () => {
     renderGallery();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Late Night 복제' }));
     expect(duplicateMock).toHaveBeenCalledWith('aa');
+  });
+
+  it('P1-D: shows the backup notice banner when there is at least one playlist', () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    renderGallery();
+    expect(screen.getByText(/이 기기에만 저장/)).toBeInTheDocument();
+  });
+
+  it('P1-D: does NOT show the banner in the empty state', () => {
+    playlistsMock = [];
+    renderGallery();
+    expect(screen.queryByText(/이 기기에만 저장/)).toBeNull();
+  });
+
+  it('P1-D: dismissing hides the banner and persists the choice', async () => {
+    playlistsMock = [mk('aa', 'Late Night')];
+    renderGallery();
+    expect(screen.getByText(/이 기기에만 저장/)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: '백업 안내 닫기' }));
+    expect(screen.queryByText(/이 기기에만 저장/)).toBeNull();
+    expect(localStorage.getItem('yejin.backupNoticeDismissed')).toBe('1');
+  });
+
+  it('P1-D: stays hidden when already dismissed in localStorage', () => {
+    localStorage.setItem('yejin.backupNoticeDismissed', '1');
+    playlistsMock = [mk('aa', 'Late Night')];
+    renderGallery();
+    expect(screen.queryByText(/이 기기에만 저장/)).toBeNull();
   });
 
   it('renders 내보내기 / 가져오기 backup buttons in the header', () => {
