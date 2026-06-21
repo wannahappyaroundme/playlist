@@ -43,7 +43,9 @@ export default function Player() {
   // 광고/로딩 감지: 라이브 재생 길이가 곡 길이와 크게 다르면 아직 '진짜 곡'이 아님(보통 선광고).
   const contentReady = useCallback(() => {
     if (expectedDur <= 0) return true; // 길이 정보 없으면 게이트하지 않음(과차단 방지)
-    return Math.abs(getDuration() - expectedDur) <= Math.max(6, expectedDur * 0.05);
+    const live = getDuration();
+    if (live <= 0) return true; // 버퍼링/메타 미로딩(0)은 게이트하지 않음 — 흰 줄 깜빡임 방지
+    return Math.abs(live - expectedDur) <= Math.max(6, expectedDur * 0.05);
   }, [getDuration, expectedDur]);
   const activeIndex = useLyricSync(
     playback.getCurrentTime,

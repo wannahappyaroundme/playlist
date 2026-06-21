@@ -136,7 +136,9 @@ export default function SharedView() {
   // 광고/로딩 동안 가사 시계를 멈추고 진짜 곡 시작 시 0초부터 맞춘다(Player와 동일).
   const contentReady = useCallback(() => {
     if (expectedDur <= 0) return true;
-    return Math.abs(getDuration() - expectedDur) <= Math.max(6, expectedDur * 0.05);
+    const live = getDuration();
+    if (live <= 0) return true; // 버퍼링/메타 미로딩(0)은 게이트하지 않음 — 흰 줄 깜빡임 방지
+    return Math.abs(live - expectedDur) <= Math.max(6, expectedDur * 0.05);
   }, [getDuration, expectedDur]);
   const activeIndex = useLyricSync(
     playback.getCurrentTime,

@@ -82,10 +82,8 @@ export default function Controls({
           aria-label="shuffle"
           onClick={onToggleShuffle}
           className={
-            'mr-2 flex h-10 w-10 items-center justify-center rounded-full transition ' +
-            (shuffle
-              ? 'bg-white/15 text-white ring-1 ring-white/30'
-              : 'text-white/40 hover:text-white/70')
+            'mr-2 flex h-10 w-10 items-center justify-center rounded-full text-white transition ' +
+            (shuffle ? 'bg-white/20 ring-1 ring-white/40' : 'hover:bg-white/10')
           }
         >
           <ShuffleIcon className="h-5 w-5" />
@@ -95,7 +93,7 @@ export default function Controls({
           type="button"
           aria-label="prev"
           onClick={onPrev}
-          className="text-white/80 transition hover:text-white active:scale-90"
+          className="text-white transition hover:opacity-80 active:scale-90"
         >
           <PrevIcon className="h-7 w-7" />
         </button>
@@ -117,7 +115,7 @@ export default function Controls({
           type="button"
           aria-label="next"
           onClick={onNext}
-          className="text-white/80 transition hover:text-white active:scale-90"
+          className="text-white transition hover:opacity-80 active:scale-90"
         >
           <NextIcon className="h-7 w-7" />
         </button>
@@ -130,10 +128,8 @@ export default function Controls({
           aria-label={repeatLabel(repeat)}
           onClick={onCycleRepeat}
           className={
-            'ml-2 flex h-10 w-10 items-center justify-center rounded-full transition ' +
-            (repeat === 'off'
-              ? 'text-white/40 hover:text-white/70'
-              : 'bg-white/15 text-white ring-1 ring-white/30')
+            'ml-2 flex h-10 w-10 items-center justify-center rounded-full text-white transition ' +
+            (repeat === 'off' ? 'hover:bg-white/10' : 'bg-white/20 ring-1 ring-white/40')
           }
         >
           {repeat === 'one' ? (

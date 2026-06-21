@@ -72,6 +72,10 @@ export function useLyricSync(
   const lastSampledAtRef = useRef(0);
   const indexRef = useRef(-1);
   const primedRef = useRef(false);
+  // '진짜 곡'이 한 번이라도 시작됐는지(곡당). true가 되면 contentReady 게이트로 더는 가사를
+  // 비우지 않는다 — 재생 중 버퍼링/화질전환으로 getDuration()이 잠깐 0/이상값을 돌려줘도
+  // (그 한 프레임 contentReady=false) 흰 줄이 사라지고 시계가 튀는 것을 막는다.
+  const startedRealRef = useRef(false);
   // 비정상 샘플(음수/큰 역점프)을 연속 거부한 횟수. 같은 이상값이 2틱 연속이면 실제 seek로 보고
   // 받아들여 영구 차단을 막는다(단발 글리치만 무시).
   const rejectedRef = useRef(0);
@@ -84,6 +88,7 @@ export function useLyricSync(
     if (!isPlaying) return;
     let raf = 0;
     primedRef.current = false;
+    startedRealRef.current = false;
 
     const prime = (now: number) => {
       const raw = getCurrentTime();
@@ -95,8 +100,10 @@ export function useLyricSync(
     };
 
     const tick = (now: number) => {
-      // 콘텐츠 미준비(광고/로딩): 가사 시계 정지 + 첫 줄 유지, 준비되면 그때부터 prime.
-      if (contentReady && !contentReady()) {
+      // 콘텐츠 미준비(선광고/메타로딩): 가사 시계 정지 + 첫 줄 보류, 준비되면 그때부터 prime.
+      // 단, 게이트는 '진짜 곡 시작 전'에만 적용한다 — 한 번 시작(startedRealRef)한 뒤에는
+      // 일시적 length 변화(버퍼링 중 getDuration()=0, 재인코딩 오차 등)로 비우지 않는다.
+      if (contentReady && !contentReady() && !startedRealRef.current) {
         if (indexRef.current !== -1) {
           indexRef.current = -1;
           setActiveIndex(-1);
@@ -106,6 +113,7 @@ export function useLyricSync(
         return;
       }
       if (!primedRef.current) prime(now); // 진입/재개 시 현재 재생초로 정렬
+      startedRealRef.current = true; // 이 시점부터 곡이 시작된 것으로 보고 게이트로 비우지 않음
 
       const intervalElapsed = now - lastSampledAtRef.current >= SAMPLE_INTERVAL_MS;
       // 보간 추정치가 실제 재생 위치에서 크게 벗어났으면(seek/일시정지 복귀) 즉시 재샘플.

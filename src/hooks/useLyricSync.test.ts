@@ -90,6 +90,37 @@ describe('useLyricSync', () => {
     expect(result.current).toBe(2);
   });
 
+  it('gates before the real song starts, then never blanks once started (30s bug)', () => {
+    let t = 0;
+    let ready = false; // 선광고/메타로딩: 아직 진짜 곡 아님
+    const getCurrentTime = () => t;
+    const contentReady = () => ready;
+    const { result } = renderHook(() =>
+      useLyricSync(getCurrentTime, true, lines, 0, contentReady),
+    );
+
+    // 시작 전: 게이트가 막아 활성 줄 없음(-1)
+    flushFrame(16);
+    expect(result.current).toBe(-1);
+    t = 5;
+    flushFrame(16);
+    expect(result.current).toBe(-1);
+
+    // 진짜 곡 시작: 게이트 통과 → 그 시점 재생초로 prime되고 추적
+    ready = true;
+    flushFrame(16);
+    expect(result.current).toBe(1);
+
+    // 재생 중 일시적 버퍼링/화질전환으로 contentReady가 false로 깜빡여도(=getDuration 0/이상값),
+    // 한 번 시작한 뒤이므로 흰 줄을 비우지 않고 계속 추적해야 한다.
+    ready = false;
+    t = 10;
+    flushFrame(300);
+    expect(result.current).toBe(2);
+    flushFrame(16);
+    expect(result.current).toBe(2);
+  });
+
   it('accepts a real backward seek that persists across ticks', () => {
     let t = 10;
     const getCurrentTime = () => t;
