@@ -101,6 +101,73 @@ describe('usePlayback state machine (smoke)', () => {
     expect(result.current.repeat).toBe('one');
   });
 
+  it('shuffle defaults off and toggleShuffle flips it (independent of repeat)', () => {
+    const { result } = renderHook(() => usePlayback(), { wrapper });
+    expect(result.current.shuffle).toBe(false);
+    act(() => result.current.toggleShuffle());
+    expect(result.current.shuffle).toBe(true);
+    // shuffle + repeat-all coexist (separate axes)
+    act(() => result.current.setRepeat('all'));
+    expect(result.current.shuffle).toBe(true);
+    expect(result.current.repeat).toBe('all');
+    act(() => result.current.toggleShuffle());
+    expect(result.current.shuffle).toBe(false);
+  });
+
+  it('next() with shuffle on jumps to a non-current index (never stops)', async () => {
+    installFakePlayer();
+    const randSpy = vi.spyOn(Math, 'random').mockReturnValue(0); // deterministic
+    try {
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      await waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+      // last track in off mode would normally stop; shuffle must still advance
+      act(() => result.current.playQueue([song('a1'), song('b2'), song('c3')], 2));
+      act(() => result.current.toggleShuffle());
+      act(() => result.current.next());
+      // rand=0 from current=2, length=3 → pick 0 (0<2) → index 0
+      expect(result.current.currentIndex).toBe(0);
+      expect(result.current.currentIndex).not.toBe(2);
+    } finally {
+      randSpy.mockRestore();
+    }
+  });
+
+  it('ENDED with shuffle on auto-advances to a non-current index (off would stop)', async () => {
+    installFakePlayer();
+    const randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      await waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+      act(() => result.current.playQueue([song('a1'), song('b2'), song('c3')], 0));
+      act(() => result.current.toggleShuffle());
+      // song ends; repeat is off (would stop) but shuffle takes over
+      act(() => capturedHandlers.onStateChange!(0 /* ENDED */));
+      // rand≈1 from current=0, length=3 → floor(0.99*2)=1, 1>=0 → +1 → index 2
+      expect(result.current.currentIndex).toBe(2);
+      expect(result.current.currentIndex).not.toBe(0);
+    } finally {
+      randSpy.mockRestore();
+    }
+  });
+
+  it("ENDED with repeat 'one' replays even when shuffle is on (one wins)", async () => {
+    installFakePlayer();
+    try {
+      const { result } = renderHook(() => usePlayback(), { wrapper });
+      await waitFor(() => expect(capturedHandlers.onStateChange).toBeTypeOf('function'));
+      act(() => result.current.playQueue([song('a1'), song('b2')], 0));
+      act(() => result.current.toggleShuffle());
+      act(() => result.current.setRepeat('one'));
+      act(() => capturedHandlers.onStateChange!(0 /* ENDED */));
+      // index unchanged (replayed same song), player seeked to 0 + replayed
+      expect(result.current.currentIndex).toBe(0);
+      expect(fakePlayer.seekTo).toHaveBeenCalledWith(0);
+      expect(fakePlayer.playVideo).toHaveBeenCalled();
+    } finally {
+      // no spy to restore
+    }
+  });
+
   it('playQueue populates queue/current WITHOUT marking started (no auto-play)', () => {
     const { result } = renderHook(() => usePlayback(), { wrapper });
     act(() => result.current.playQueue([song('a1'), song('b2'), song('c3')], 1));

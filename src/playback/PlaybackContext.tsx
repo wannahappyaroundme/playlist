@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { createYtPlayer, YT_STATE, type YtPlayer } from '../lib/ytPlayer';
-import { nextIndex, prevIndex } from '../lib/queue';
+import { nextIndex, prevIndex, nextShuffleIndex } from '../lib/queue';
 import { saveSong, StorageWriteError } from '../lib/storage';
 import type { Song, RepeatMode } from '../types';
 
@@ -102,6 +102,8 @@ export interface PlaybackApi {
   current: Song | null;
   isPlaying: boolean;
   repeat: RepeatMode;
+  /** 셔플 모드(반복과 독립). 켜지면 다음 곡/자동 진행이 임의 순서로 간다. */
+  shuffle: boolean;
   progress: number;
   duration: number;
   started: boolean;
@@ -116,6 +118,8 @@ export interface PlaybackApi {
   seek(sec: number): void;
   cycleRepeat(): void;
   setRepeat(r: RepeatMode): void;
+  /** 셔플 on/off 토글(반복과 독립). */
+  toggleShuffle(): void;
   getCurrentTime(): number;
   /** 라이브 플레이어 길이(초). 광고 중에는 광고 길이를 반환하므로 곡 길이와 비교해 광고를 감지한다. */
   getDuration(): number;
@@ -129,6 +133,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [repeat, setRepeatState] = useState<RepeatMode>('off');
+  const [shuffle, setShuffle] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [started, setStarted] = useState(false);
@@ -139,11 +144,13 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const queueRef = useRef(queue);
   const indexRef = useRef(currentIndex);
   const repeatRef = useRef(repeat);
+  const shuffleRef = useRef(shuffle);
   // durationSec 자가치유 루프 가드: 곡 로드(현재 인덱스)당 한 번만 치유한다.
   const healedIndexRef = useRef(-1);
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { indexRef.current = currentIndex; }, [currentIndex]);
   useEffect(() => { repeatRef.current = repeat; }, [repeat]);
+  useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
   // 곡이 바뀌면 다음 곡의 치유를 다시 1회 허용한다(곡별 1회 보장).
   useEffect(() => { healedIndexRef.current = -1; }, [currentIndex]);
 
@@ -164,14 +171,23 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
         const playing = isPlayingFromState(state);
         if (playing !== null) setIsPlaying(playing);
         if (state === YT_STATE.ENDED) {
-          const action = endedAction(indexRef.current, queueRef.current.length, repeatRef.current);
-          if (action.kind === 'replay') {
+          // repeat 'one'은 셔플보다 우선 — 같은 곡을 다시 재생한다.
+          if (repeatRef.current === 'one') {
             playerRef.current?.seekTo(0);
             playerRef.current?.playVideo();
-          } else if (action.kind === 'play') {
-            goTo(action.index);
+          } else if (shuffleRef.current) {
+            // 셔플: 반복과 독립. 임의 다음 곡으로 진행(off여도 멈추지 않는다).
+            goTo(nextShuffleIndex(indexRef.current, queueRef.current.length, Math.random));
+          } else {
+            const action = endedAction(indexRef.current, queueRef.current.length, repeatRef.current);
+            if (action.kind === 'replay') {
+              playerRef.current?.seekTo(0);
+              playerRef.current?.playVideo();
+            } else if (action.kind === 'play') {
+              goTo(action.index);
+            }
+            // 'stop'은 위에서 이미 isPlaying=false 처리됨
           }
-          // 'stop'은 위에서 이미 isPlaying=false 처리됨
         }
       },
       onError: () => {
@@ -267,6 +283,11 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   }, []);
 
   const next = useCallback(() => {
+    // 셔플 on: 반복과 무관하게 임의 다음 곡으로(절대 멈추지 않음).
+    if (shuffleRef.current) {
+      goTo(nextShuffleIndex(indexRef.current, queueRef.current.length, Math.random));
+      return;
+    }
     const idx = nextIndex(indexRef.current, queueRef.current.length, repeatRef.current);
     // off 마지막 트랙: prev의 0-클램프 무동작과 대칭 — 현재 곡을 끊지 않고 그대로 둔다.
     if (idx === null) return;
@@ -288,6 +309,8 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
 
   const setRepeat = useCallback((r: RepeatMode) => setRepeatState(r), []);
 
+  const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
+
   const getCurrentTime = useCallback(() => playerRef.current?.getCurrentTime() ?? 0, []);
   const getDuration = useCallback(() => playerRef.current?.getDuration() ?? 0, []);
 
@@ -300,6 +323,7 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       current,
       isPlaying,
       repeat,
+      shuffle,
       progress,
       duration,
       started,
@@ -313,12 +337,13 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
       seek,
       cycleRepeat,
       setRepeat,
+      toggleShuffle,
       getCurrentTime,
       getDuration,
     }),
     [
-      queue, currentIndex, current, isPlaying, repeat, progress, duration, started, lastError,
-      playQueue, appendToQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, getCurrentTime, getDuration,
+      queue, currentIndex, current, isPlaying, repeat, shuffle, progress, duration, started, lastError,
+      playQueue, appendToQueue, start, togglePlay, next, prev, seek, cycleRepeat, setRepeat, toggleShuffle, getCurrentTime, getDuration,
     ],
   );
 
