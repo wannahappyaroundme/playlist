@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextIndex, prevIndex } from './queue';
+import { nextIndex, prevIndex, nextShuffleIndex } from './queue';
 
 describe('nextIndex', () => {
   describe("repeat 'one'", () => {
@@ -64,5 +64,61 @@ describe('prevIndex', () => {
   it('returns 0 for empty queue', () => {
     expect(prevIndex(0, 0, 'all')).toBe(0);
     expect(prevIndex(0, 0, 'off')).toBe(0);
+  });
+});
+
+describe('nextShuffleIndex', () => {
+  it('returns 0 when length is 1 (only song)', () => {
+    expect(nextShuffleIndex(0, 1, () => 0)).toBe(0);
+    expect(nextShuffleIndex(0, 1, () => 0.99)).toBe(0);
+  });
+
+  it('returns 0 when length is 0 (empty)', () => {
+    expect(nextShuffleIndex(0, 0, () => 0.5)).toBe(0);
+  });
+
+  it('never returns the current index when length > 1', () => {
+    // rand=0 → lowest pick; rand→1 → highest pick. Both must skip current.
+    for (let current = 0; current < 4; current++) {
+      expect(nextShuffleIndex(current, 4, () => 0)).not.toBe(current);
+      expect(nextShuffleIndex(current, 4, () => 0.99)).not.toBe(current);
+    }
+  });
+
+  it('is deterministic for a fixed rand (rand=0 skips current)', () => {
+    // length 3, current 0: pick from [0,2) → floor(0*2)=0, 0>=0 so +1 → 1
+    expect(nextShuffleIndex(0, 3, () => 0)).toBe(1);
+    // current 1: floor(0*2)=0, 0<1 → stays 0
+    expect(nextShuffleIndex(1, 3, () => 0)).toBe(0);
+    // current 2: floor(0*2)=0, 0<2 → stays 0
+    expect(nextShuffleIndex(2, 3, () => 0)).toBe(0);
+  });
+
+  it('is deterministic for rand≈1 (highest non-current index)', () => {
+    // length 3, current 0: floor(0.99*2)=1, 1>=0 → +1 → 2
+    expect(nextShuffleIndex(0, 3, () => 0.99)).toBe(2);
+    // current 2: floor(0.99*2)=1, 1<2 → stays 1
+    expect(nextShuffleIndex(2, 3, () => 0.99)).toBe(1);
+  });
+
+  it('always returns a valid in-range index', () => {
+    for (let r = 0; r < 1; r += 0.07) {
+      for (let length = 2; length <= 6; length++) {
+        for (let current = 0; current < length; current++) {
+          const idx = nextShuffleIndex(current, length, () => r);
+          expect(idx).toBeGreaterThanOrEqual(0);
+          expect(idx).toBeLessThan(length);
+          expect(idx).not.toBe(current);
+        }
+      }
+    }
+  });
+
+  it('returns a valid in-range index when current is out of range', () => {
+    expect(nextShuffleIndex(-1, 3, () => 0)).toBe(0);
+    expect(nextShuffleIndex(99, 3, () => 0.99)).toBe(2);
+    const idx = nextShuffleIndex(99, 3, () => 0.5);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(idx).toBeLessThan(3);
   });
 });
