@@ -171,6 +171,22 @@ export default function SharedView() {
     navigate(`/edit/${p.id}`);
   };
 
+  // "나도 보내기"/"답장하기": 받는 사람이 보내는 사람이 되도록 빈 플레이리스트를 새로 만들어
+  // 편집기로 이동한다. quota 초과면 안내만 하고 이동하지 않는다(P1-C).
+  const startReply = () => {
+    const p = createPlaylist('');
+    try {
+      savePlaylist(p);
+    } catch (err) {
+      if (err instanceof StorageWriteError) {
+        window.alert('저장 공간이 가득 찼어요 — 갤러리에서 내보내기로 백업 후 정리해 주세요');
+        return;
+      }
+      throw err;
+    }
+    navigate(`/edit/${p.id}`);
+  };
+
   if (!shared) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center text-white">
@@ -232,13 +248,22 @@ export default function SharedView() {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={saveToLibrary}
-        className="fixed right-4 top-4 z-20 rounded-full bg-white/15 px-4 py-2 text-sm backdrop-blur hover:bg-white/25"
-      >
-        내 보관함에 저장
-      </button>
+      <div className="fixed right-4 top-4 z-20 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={startReply}
+          className="rounded-full bg-white/15 px-4 py-2 text-sm backdrop-blur hover:bg-white/25"
+        >
+          {shared.from ? '답장하기' : '나도 보내기'}
+        </button>
+        <button
+          type="button"
+          onClick={saveToLibrary}
+          className="rounded-full bg-white/15 px-4 py-2 text-sm backdrop-blur hover:bg-white/25"
+        >
+          내 보관함에 저장
+        </button>
+      </div>
     </div>
   );
 }

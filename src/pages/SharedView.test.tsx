@@ -178,6 +178,50 @@ describe('SharedView', () => {
     expect(screen.queryByText('불러오는 중…')).toBeNull();
   });
 
+  it('P1-C: "나도 보내기" creates a new empty playlist and navigates to its editor', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockImplementation((id: string) => song(id));
+    resolveMock.mockImplementation(async (id: string) => song(id));
+    const created: Playlist = { id: 'replypl', title: '', songIds: [], createdAt: '2026-06-20' };
+    createPlaylistMock.mockReturnValue(created);
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: '나도 보내기' }));
+    expect(createPlaylistMock).toHaveBeenCalled();
+    const saved = savePlaylistMock.mock.calls[savePlaylistMock.mock.calls.length - 1][0] as Playlist;
+    expect(saved.songIds).toEqual([]); // brand-new empty playlist
+    expect(navigateMock).toHaveBeenCalledWith('/edit/replypl');
+  });
+
+  it('P1-C: the reply CTA reads "답장하기" when the gift has a sender', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', from: 'Mina', songs: [{ id: 's0' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockImplementation((id: string) => song(id));
+    resolveMock.mockImplementation(async (id: string) => song(id));
+    createPlaylistMock.mockReturnValue({ id: 'replypl', title: '', songIds: [], createdAt: 'x' });
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: '답장하기' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '나도 보내기' })).toBeNull();
+  });
+
+  it('P1-C: a quota error on the reply CTA alerts and does NOT navigate', async () => {
+    const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }] };
+    decodeMock.mockReturnValue(shared);
+    getSongMock.mockImplementation((id: string) => song(id));
+    resolveMock.mockImplementation(async (id: string) => song(id));
+    createPlaylistMock.mockReturnValue({ id: 'replypl', title: '', songIds: [], createdAt: 'x' });
+    savePlaylistMock.mockImplementation(() => { throw new StorageWriteErrorMock('full'); });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    renderAt('GOOD');
+    await waitFor(() => expect(playQueueMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: '나도 보내기' }));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('저장 공간이 가득'));
+    expect(navigateMock).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
   it('P0-4: a quota error on save alerts and does NOT navigate', async () => {
     const shared: SharedPlaylist = { title: 'Gift', songs: [{ id: 's0' }] };
     decodeMock.mockReturnValue(shared);
