@@ -10,6 +10,8 @@ import React, {
 import { createYtPlayer, YT_STATE, type YtPlayer } from '../lib/ytPlayer';
 import { nextIndex, prevIndex, nextShuffleIndex } from '../lib/queue';
 import { saveSong, StorageWriteError } from '../lib/storage';
+import { useWakeLock } from '../hooks/useWakeLock';
+import { useMediaSession } from '../hooks/useMediaSession';
 import type { Song, RepeatMode } from '../types';
 
 /** 반복 모드 순환: off → all → one → off. */
@@ -315,6 +317,15 @@ export function PlaybackProvider(props: { children: React.ReactNode }): JSX.Elem
   const getDuration = useCallback(() => playerRef.current?.getDuration() ?? 0, []);
 
   const current = queue[currentIndex] ?? null;
+
+  // 모바일 편의: 재생 중 화면 꺼짐 방지 + 잠금화면/알림 미디어 컨트롤(둘 다 미지원 환경에선 no-op).
+  useWakeLock(isPlaying);
+  useMediaSession(current, isPlaying, {
+    onPlay: togglePlay,
+    onPause: togglePlay,
+    onNext: next,
+    onPrev: prev,
+  });
 
   const api = useMemo<PlaybackApi>(
     () => ({
