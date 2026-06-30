@@ -38,10 +38,13 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
     const from = anim.playbackRate;
     let raf = 0;
     const tick = (now: number) => {
-      const k = Math.min(1, (now - start) / RATE_RAMP_MS);
+      // rAF 타임스탬프가 직전 performance.now()보다 작을 수 있어(같은 프레임) k가 음수가 되면
+      // eased<0 → playbackRate가 음수가 되고, 무한 애니메이션을 음수 속도로 play()하면
+      // InvalidStateError가 난다. k를 [0,1]로 클램프하고 양수일 때만 재생한다.
+      const k = Math.min(1, Math.max(0, (now - start) / RATE_RAMP_MS));
       const eased = 1 - Math.pow(1 - k, 3); // easeOutCubic
-      anim.playbackRate = from + (target - from) * eased;
-      if (spinning) anim.play();
+      anim.playbackRate = Math.max(0, from + (target - from) * eased);
+      if (spinning && anim.playbackRate > 0) anim.play();
       if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

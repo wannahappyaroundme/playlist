@@ -129,7 +129,9 @@ export async function fetchLyrics(
   getUrl.searchParams.set('artist_name', p.artist);
   getUrl.searchParams.set('track_name', p.track);
   if (p.album) getUrl.searchParams.set('album_name', p.album);
-  if (typeof p.durationSec === 'number') {
+  // duration=0(길이 미상)을 보내면 LRCLIB가 400을 돌려준다 — 0/음수면 아예 생략한다
+  // (이 경우 /get은 정확매칭 대신 일반 조회가 되고, 못 찾으면 search로 폴백).
+  if (typeof p.durationSec === 'number' && p.durationSec > 0) {
     getUrl.searchParams.set('duration', String(Math.round(p.durationSec)));
   }
   const getRes = await requestWithRetry(getUrl.toString(), fetchImpl, sleep);
