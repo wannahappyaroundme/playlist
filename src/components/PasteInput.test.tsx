@@ -38,7 +38,7 @@ describe('PasteInput', () => {
     resolveMock.mockReset();
   });
 
-  it('resolves a pasted link and calls onAdd with the resolved song', async () => {
+  it('resolves a pasted link and calls onAdd once with the resolved song', async () => {
     resolveMock.mockResolvedValue(makeSong('abcDEF12345'));
     const onAdd = vi.fn();
     render(<PasteInput onAdd={onAdd} />);
@@ -46,10 +46,11 @@ describe('PasteInput', () => {
     await userEvent.click(screen.getByRole('button', { name: /add/i }));
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
     expect(resolveMock).toHaveBeenCalledWith('abcDEF12345');
-    expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'abcDEF12345' }));
+    // onAdd now receives an array of resolved songs (batch contract)
+    expect(onAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'abcDEF12345' })]);
   });
 
-  it('processes multiple lines, calling onAdd once per valid line', async () => {
+  it('processes multiple lines, calling onAdd ONCE with all songs in paste order', async () => {
     resolveMock
       .mockResolvedValueOnce(makeSong('aaaaaaaaaa1'))
       .mockResolvedValueOnce(makeSong('bbbbbbbbbb2'));
@@ -60,7 +61,11 @@ describe('PasteInput', () => {
     // paste two lines (type with newline)
     await userEvent.paste('https://youtu.be/aaaaaaaaaa1\nhttps://youtu.be/bbbbbbbbbb2');
     await userEvent.click(screen.getByRole('button', { name: /add/i }));
-    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+    expect(onAdd).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'aaaaaaaaaa1' }),
+      expect.objectContaining({ id: 'bbbbbbbbbb2' }),
+    ]);
   });
 
   it('P0-3: dedupes the same id within one batch (adds once, errors the dup)', async () => {
@@ -72,7 +77,8 @@ describe('PasteInput', () => {
     // same video id pasted twice
     await userEvent.paste('https://youtu.be/dupID123456\nhttps://youtu.be/dupID123456');
     await userEvent.click(screen.getByRole('button', { name: /add/i }));
-    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1)); // added once, not twice
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+    expect(onAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'dupID123456' })]); // once
     expect(resolveMock).toHaveBeenCalledTimes(1); // 2nd skipped before resolve
     expect(screen.getByTestId('paste-error')).toHaveTextContent('중복');
   });
@@ -108,6 +114,8 @@ describe('PasteInput', () => {
     await userEvent.paste('https://youtu.be/aaaaaaaaaa1\nhttps://youtu.be/bbbbbbbbbb2');
     await userEvent.click(screen.getByRole('button', { name: /add/i }));
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+    // only the second (successful) song is added; the first errored
+    expect(onAdd).toHaveBeenCalledWith([expect.objectContaining({ id: 'bbbbbbbbbb2' })]);
     expect(screen.getByTestId('paste-error')).toBeInTheDocument();
   });
 

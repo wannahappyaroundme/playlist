@@ -75,13 +75,22 @@ export default function Editor() {
     );
   }
 
-  const handleAdd = (song: Song) => {
-    // 같은 링크/저장된 곡을 다시 담으면 songIds=[X,X]가 되어 React key 중복 + 같은 곡 2번 재생.
-    if (playlist.songIds.includes(song.id)) {
+  // 여러 곡을 '한 번에' 받아 한 번의 persist로 추가한다 — 곡마다 persist하면 stale-closure로
+  // 마지막 곡만 남는 버그가 생긴다. 이미 담긴 id는 건너뛰고(중복 재생/키 충돌 방지),
+  // 새로 담긴 게 하나도 없으면 안내만 한다.
+  const handleAdd = (incoming: Song[]) => {
+    const existing = new Set(playlist.songIds);
+    const toAdd: string[] = [];
+    for (const s of incoming) {
+      if (existing.has(s.id)) continue;
+      existing.add(s.id);
+      toAdd.push(s.id);
+    }
+    if (toAdd.length === 0) {
       window.alert('이미 담긴 곡이에요');
       return;
     }
-    persist({ ...playlist, songIds: [...playlist.songIds, song.id] });
+    persist({ ...playlist, songIds: [...playlist.songIds, ...toAdd] });
   };
 
   // 순서/삭제는 모두 songId 기준으로 동작한다 — 검색 필터로 화면 인덱스가 전체 목록

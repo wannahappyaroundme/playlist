@@ -29,7 +29,7 @@ vi.mock('../hooks/useSongResolver', () => ({
   useSongResolver: () => ({ resolve: vi.fn(), reResolve: reResolveMock, resolving: false }),
 }));
 
-let lastOnAdd: ((s: Song) => void) | null = null;
+let lastOnAdd: ((s: Song[]) => void) | null = null;
 vi.mock('../components/PasteInput', () => ({
   default: ({ onAdd }: any) => { lastOnAdd = onAdd; return <div data-testid="paste-input" />; },
 }));
@@ -84,11 +84,21 @@ describe('Editor', () => {
   it('PasteInput.onAdd appends to songIds and saves', () => {
     renderEditor();
     expect(lastOnAdd).toBeTypeOf('function');
-    lastOnAdd!(song('s1'));
+    lastOnAdd!([song('s1')]);
     expect(savePlaylistMock).toHaveBeenCalled();
     const calls = savePlaylistMock.mock.calls;
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.songIds).toEqual(['s0', 's1']);
+  });
+
+  it('onAdd appends MANY songs in order in a single save (batch add)', () => {
+    renderEditor();
+    savePlaylistMock.mockClear();
+    lastOnAdd!([song('s1'), song('s2'), song('s3')]);
+    // exactly one persist, all three appended in order (no stale-closure last-wins)
+    expect(savePlaylistMock).toHaveBeenCalledTimes(1);
+    const saved = savePlaylistMock.mock.calls[0][0] as Playlist;
+    expect(saved.songIds).toEqual(['s0', 's1', 's2', 's3']);
   });
 
   it('P0-3: onAdd ignores a song already in the playlist and alerts', () => {
@@ -96,7 +106,7 @@ describe('Editor', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     renderEditor();
     savePlaylistMock.mockClear();
-    lastOnAdd!(song('s0')); // re-add the same id
+    lastOnAdd!([song('s0')]); // re-add the same id
     expect(alertSpy).toHaveBeenCalledWith('이미 담긴 곡이에요');
     expect(savePlaylistMock).not.toHaveBeenCalled(); // not persisted, no [s0,s0]
     alertSpy.mockRestore();
@@ -180,7 +190,7 @@ describe('Editor', () => {
   it('P1-A: persist defaults coverVideoId to songIds[0] when none is pinned', () => {
     getPlaylistMock.mockReturnValue(pl(['s0', 's1']));
     renderEditor();
-    lastOnAdd!(song('s2')); // any persist
+    lastOnAdd!([song('s2')]); // any persist
     const calls = savePlaylistMock.mock.calls;
     const saved = calls[calls.length - 1][0] as Playlist;
     expect(saved.coverVideoId).toBe('s0');
