@@ -223,7 +223,8 @@ describe('Editor', () => {
       (c: any[]) => Array.isArray(c[1]) && c[1].length === 1,
     );
     expect(singleCall).toBeTruthy();
-    expect((singleCall as any[])[1]).toEqual([{ id: 's1', title: 'song-s1' }]);
+    // compact 포맷은 곡 제목을 URL에 넣지 않으므로 id만 전달한다
+    expect((singleCall as any[])[1]).toEqual([{ id: 's1' }]);
   });
 
   // ---- Item 1: search / filter ----

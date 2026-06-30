@@ -142,7 +142,7 @@ export default function Editor() {
 
   const { encoded, titlesDropped, tooLong } = buildSharePayload(
     { title: playlist.title, message: playlist.message, from: playlist.from, color: playlist.color },
-    songs.map((s) => ({ id: s.id, title: s.title })),
+    songs.map((s) => ({ id: s.id })),
   );
   const shareUrl = `${shareBase}${encoded}`;
 
@@ -157,7 +157,7 @@ export default function Editor() {
     ? `${shareBase}${
         buildSharePayload(
           { title: shareSong.title, message: playlist.message, from: playlist.from },
-          [{ id: shareSong.id, title: shareSong.title }],
+          [{ id: shareSong.id }],
         ).encoded
       }`
     : '';
