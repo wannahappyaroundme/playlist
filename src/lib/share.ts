@@ -1,18 +1,15 @@
 import type { SharedPlaylist } from '../types';
 import { isVideoId } from './youtube';
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i]);
-  }
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
+// 새 공유 링크는 lz-string으로 압축한다(한글 제목/메시지의 긴 UTF-8 base64를 보통 50~70%
+// 줄인다). 압축 결과 앞에 '~' 마커를 붙이는데, 이 문자는 lz-string의 URI-safe 알파벳
+// (A-Za-z0-9+-$)에도, 구버전 base64url(A-Za-z0-9-_)에도 없어서 decode가 새/구 포맷을
+// 모호함 없이 구분한다 → 이미 만들어 보낸 구버전 링크도 계속 열린다.
+const COMPRESS_MARKER = '~';
 
 export function encodePlaylist(p: SharedPlaylist): string {
-  const json = JSON.stringify(p);
-  const bytes = new TextEncoder().encode(json);
-  return bytesToBase64Url(bytes);
+  return COMPRESS_MARKER + compressToEncodedURIComponent(JSON.stringify(p));
 }
 
 // Conservative cap for a comfortably shareable encoded payload (messenger/QR).
@@ -94,8 +91,16 @@ function isSharedPlaylist(v: unknown): v is SharedPlaylist {
 export function decodePlaylist(encoded: string): SharedPlaylist | null {
   if (!encoded) return null;
   try {
-    const bytes = base64UrlToBytes(encoded);
-    const json = new TextDecoder().decode(bytes);
+    let json: string;
+    if (encoded[0] === COMPRESS_MARKER) {
+      // 새 포맷: lz-string 압축
+      json = decompressFromEncodedURIComponent(encoded.slice(1)) ?? '';
+      if (!json) return null;
+    } else {
+      // 구버전 포맷: base64url(UTF-8 JSON) — 이전에 공유된 링크 호환
+      const bytes = base64UrlToBytes(encoded);
+      json = new TextDecoder().decode(bytes);
+    }
     const parsed = JSON.parse(json);
     return isSharedPlaylist(parsed) ? parsed : null;
   } catch {

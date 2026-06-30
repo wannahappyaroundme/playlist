@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { decompressFromEncodedURIComponent } from 'lz-string';
 import type { SharedPlaylist } from '../types';
 import { buildSharePayload, decodePlaylist, encodePlaylist } from './share';
 
@@ -8,21 +9,47 @@ const sample: SharedPlaylist = {
   songs: [{ id: 'abc12345678', title: 'Track A' }, { id: 'def98765432' }],
 };
 
+// 구버전(압축 전) 공유 링크를 만드는 헬퍼 — base64url(UTF-8 JSON).
+function legacyEncode(p: unknown): string {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(p))))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
 describe('encodePlaylist', () => {
-  it('produces a URL-safe base64url string (no +, /, or =)', () => {
+  it('produces a compressed payload tagged with the ~ marker', () => {
     const enc = encodePlaylist(sample);
-    expect(enc).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(enc).not.toMatch(/[+/=]/);
+    expect(enc[0]).toBe('~');
+    // lz-string URI-safe 알파벳(마커 제외): A-Za-z0-9+-$
+    expect(enc.slice(1)).toMatch(/^[A-Za-z0-9+\-$]+$/);
   });
 
-  it('round-trips back to the same JSON via the same base64url scheme', () => {
+  it('round-trips back to the same JSON via the lz-string scheme', () => {
     const enc = encodePlaylist(sample);
-    // reverse the transform manually to assert the scheme, independent of decode()
-    const b64 = enc.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-    const json = new TextDecoder().decode(bytes);
-    expect(JSON.parse(json)).toEqual(sample);
+    const json = decompressFromEncodedURIComponent(enc.slice(1));
+    expect(JSON.parse(json!)).toEqual(sample);
+  });
+
+  it('compresses a long Korean payload shorter than the legacy base64url', () => {
+    const big: SharedPlaylist = {
+      title: '너에게 보내는 새벽 감성 플레이리스트 — 끝까지 들어줘',
+      message: '오늘 하루도 고생 많았어. 이 노래들 들으면서 푹 쉬어. 사랑해 정말로 많이많이',
+      from: '예진',
+      songs: Array.from({ length: 20 }, (_, i) => ({
+        id: 'aaaaaaaaaa' + i.toString().padStart(1, '0').slice(0, 1),
+        title: `정말 좋아하는 노래 제목 ${i} 번째 트랙입니다`,
+      })),
+    };
+    const compressed = encodePlaylist(big);
+    const legacy = legacyEncode(big);
+    expect(compressed.length).toBeLessThan(legacy.length);
+  });
+});
+
+describe('decodePlaylist backward-compat', () => {
+  it('still decodes a legacy (uncompressed base64url) link', () => {
+    expect(decodePlaylist(legacyEncode(sample))).toEqual(sample);
   });
 });
 
@@ -70,9 +97,14 @@ describe('buildSharePayload (Fix 17+18)', () => {
   });
 
   it('tooLong is true when even the id-only payload exceeds the threshold', () => {
-    // ~200 valid 11-char ids → id-only encoding is well over a tiny threshold
-    const many = Array.from({ length: 200 }, () => ({ id: 'aaaaaaaaaaa', title: 'x' }));
-    const r = buildSharePayload({ title: 'L' }, many, 100);
+    // distinct ids so compression can't collapse them; threshold set just below the
+    // actual id-only compressed length so the assertion is robust to the codec.
+    const many = Array.from({ length: 200 }, (_, i) => ({
+      id: ('id' + i.toString(36)).padEnd(11, 'z').slice(0, 11),
+      title: 'x',
+    }));
+    const idOnlyLen = buildSharePayload({ title: 'L' }, many, 1).encoded.length;
+    const r = buildSharePayload({ title: 'L' }, many, idOnlyLen - 1);
     expect(r.tooLong).toBe(true);
     // titlesDropped is also true (titles were dropped trying to fit)
     expect(r.titlesDropped).toBe(true);
