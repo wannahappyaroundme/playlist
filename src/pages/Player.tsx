@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getPlaylist, getSong } from '../lib/storage';
 import { usePlayback } from '../playback/PlaybackContext';
 import { useLyricSync } from '../hooks/useLyricSync';
+import { hasDisplayableLyrics } from '../lib/lyrics';
 import GradientBg from '../components/GradientBg';
 import LpDisc from '../components/LpDisc';
 import LyricsView from '../components/LyricsView';
@@ -73,6 +74,25 @@ export default function Player() {
     expectedDur > 0 &&
     Math.abs(playback.duration - expectedDur) > Math.max(6, expectedDur * 0.05);
 
+  // 표시할 가사가 없으면 가사 칸을 없애고 LP만 가운데 띄운다.
+  const showLyrics = !!current && hasDisplayableLyrics(current.lyrics);
+  // Controls는 두 레이아웃에서 동일하게 쓰이므로 한 번만 만들어 재사용한다.
+  const controls = (
+    <Controls
+      isPlaying={playback.isPlaying}
+      repeat={playback.repeat}
+      shuffle={playback.shuffle}
+      progress={playback.progress}
+      duration={playback.duration}
+      onToggle={playback.togglePlay}
+      onNext={playback.next}
+      onPrev={playback.prev}
+      onSeek={playback.seek}
+      onCycleRepeat={playback.cycleRepeat}
+      onToggleShuffle={playback.toggleShuffle}
+    />
+  );
+
   return (
     <div className="relative h-[100dvh] overflow-hidden text-white">
       <GradientBg colors={colors} />
@@ -91,8 +111,8 @@ export default function Player() {
           from={from}
           onPlay={playback.start}
         />
-      ) : (
-        <div className="relative z-10 grid h-[100dvh] grid-rows-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto] gap-4 px-6 py-6 lg:grid-cols-[46%_54%] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-6 lg:px-10 lg:py-8">
+      ) : showLyrics ? (
+        <div className="relative z-10 grid h-[100dvh] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto] gap-4 px-6 py-6 lg:grid-cols-[46%_54%] lg:grid-rows-[minmax(0,1fr)_auto] lg:gap-6 lg:px-10 lg:py-8">
           <div className="flex min-h-0 items-center justify-center">
             <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} />
           </div>
@@ -101,21 +121,15 @@ export default function Player() {
               <LyricsView lyrics={current.lyrics} activeIndex={activeIndex} accent={colors.accent} />
             </div>
           </div>
-          <div className="lg:col-span-2">
-            <Controls
-              isPlaying={playback.isPlaying}
-              repeat={playback.repeat}
-              shuffle={playback.shuffle}
-              progress={playback.progress}
-              duration={playback.duration}
-              onToggle={playback.togglePlay}
-              onNext={playback.next}
-              onPrev={playback.prev}
-              onSeek={playback.seek}
-              onCycleRepeat={playback.cycleRepeat}
-              onToggleShuffle={playback.toggleShuffle}
-            />
+          <div className="lg:col-span-2">{controls}</div>
+        </div>
+      ) : (
+        // 가사 없음: '가사 없음' 문구 대신 앨범+디스크만 화면 정중앙에 크게 띄운다.
+        <div className="relative z-10 grid h-[100dvh] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] gap-4 px-6 py-6 lg:px-10 lg:py-8">
+          <div className="flex min-h-0 items-center justify-center">
+            <LpDisc cover={current.cover} spinning={playback.isPlaying} accent={colors.accent} big />
           </div>
+          <div>{controls}</div>
         </div>
       )}
     </div>

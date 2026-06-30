@@ -5,12 +5,14 @@ interface LpDiscProps {
   cover: string;
   spinning: boolean;
   accent: string;
+  /** 가사 없이 단독으로 가운데 띄울 때 더 크게(여전히 viewport 비례). */
+  big?: boolean;
 }
 
 const SPIN_DURATION_MS = 5000;
 const RATE_RAMP_MS = 800;
 
-export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
+export default function LpDisc({ cover, spinning, accent, big = false }: LpDiscProps) {
   const vinylRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<Animation | null>(null);
 
@@ -65,7 +67,12 @@ export default function LpDisc({ cover, spinning, accent }: LpDiscProps) {
   // ~63.3%, leaving the cover's left ~58% (of its own width) visible as the sleeve.
   return (
     <div
-      className="relative w-full max-w-[min(84vw,420px)] lg:max-w-[min(82vmin,680px)] mx-auto select-none"
+      className={
+        // w-full(셀 너비 = viewport - 좌우패딩, 이미 기기 너비에 비례) + px 상한 + mx-auto
+        // → 좌우 여백으로 항상 정중앙, 좁은 화면에서도 절대 넘치지 않고 비례 축소된다.
+        'relative w-full mx-auto select-none ' +
+        (big ? 'max-w-[560px] lg:max-w-[760px]' : 'max-w-[420px] lg:max-w-[640px]')
+      }
       style={{
         // 2 - overlap as an aspect-ratio width:height (height == D == one piece)
         aspectRatio: `calc(2 - var(--lp-overlap, 42%) / 100%) / 1`,
